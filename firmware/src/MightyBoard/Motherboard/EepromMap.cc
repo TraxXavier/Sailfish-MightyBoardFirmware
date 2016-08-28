@@ -421,6 +421,14 @@ bool hasHBP() {
 	return (getEeprom8(eeprom_offsets::HBP_PRESENT, 1) == 1);
 }
 
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+bool hasCHE() {
+	return (getEeprom8(eeprom_offsets::CHE_PRESENT, 1) == 1);
+}
+#endif
+// MOD Trax END
+
 //
 void storeToolheadToleranceDefaults(){
 	

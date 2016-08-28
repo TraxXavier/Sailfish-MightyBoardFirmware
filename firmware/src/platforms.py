@@ -56,6 +56,20 @@ platforms = {
   '[ os.path.basename(f) for f in glob.glob(\'../../src/MightyBoard/Motherboard/boards/mighty_one/*.cc\') ]' ]
           },
 
+    'mighty_one-ctc' :
+        { 'mcu' : 'atmega1280',
+          'programmer' : 'stk500v1',
+          'board_directory' : 'mighty_one',
+          'defines' : [ 'CTC_DUPLICATOR', 'HAS_ENCLOSURE', '-HAS_RGB_LED' , 
+                        'PSTOP_ZMIN_LEVEL' , 'HEATERS_ON_STEROIDS'],
+          'squeeze' : [ 'Menu.cc', 'Interface.cc', 'InterfaceBoard.cc',
+                        'LiquidCrystalSerial.cc', 'DigiPots.cc', 'PSU.cc',
+                        'Eeprom.cc', 'PSU.cc', 'EepromMap.cc', 'Piezo.cc',
+                        'UtilityScripts.cc', 'RGB_LED.cc',
+                        'StandardButtonArray.cc',
+  '[ os.path.basename(f) for f in glob.glob(\'../../src/MightyBoard/Motherboard/boards/mighty_one/*.cc\') ]' ]
+          },
+
     'mighty_one-corexy' :
         { 'mcu' : 'atmega1280',
           'programmer' : 'stk500v1',
@@ -87,6 +101,15 @@ platforms = {
           'board_directory' : 'mighty_one',
           'defines' : [ 'BUILD_STATS', 'ALTERNATE_UART', 'AUTO_LEVEL',
                         'PSTOP_ZMIN_LEVEL' ]
+        },
+
+    'mighty_one-2560-ctc' :
+        { 'mcu' : 'atmega2560',
+          'programmer' : 'stk500v2',
+          'board_directory' : 'mighty_one',
+          'defines' : [ 'BUILD_STATS','UART_DEBUG', 'AUTO_LEVEL', 
+          							'CTC_DUPLICATOR', 'HAS_ENCLOSURE', '-HAS_RGB_LED' , 
+                        'PSTOP_ZMIN_LEVEL' , 'HEATERS_ON_STEROIDS']
         },
 
     'mighty_one-2560-corexy' :

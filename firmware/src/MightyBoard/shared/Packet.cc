@@ -151,3 +151,33 @@ void OutPacket::append32(uint32_t value) {
 	appendByte((value>>16)&0xff);
 	appendByte((value>>24)&0xff);
 }
+
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+
+#define DEBUG_BUFFER_SIZE 64
+//uint8_t input_data[DEBUG_BUFFER_SIZE];
+uint8_t output_data[DEBUG_BUFFER_SIZE*2];
+//CircularBuffer input_buffer(DEBUG_BUFFER_SIZE, input_data);
+CircularBuffer output_buffer(DEBUG_BUFFER_SIZE*2, output_data);
+
+void OutStream::appendPStr(const prog_uchar pstr[]) {
+	while(char cur = pgm_read_byte(pstr++))
+		output_buffer.push((uint8_t)cur);
+}
+
+void OutStream::appendStr(const char* str) {
+	while(char cur = *str++)
+		output_buffer.push((uint8_t)cur);
+}
+
+bool OutStream::isSending() const {
+	return !output_buffer.isEmpty();
+}
+	
+uint8_t OutStream::getNextByteToSend() {
+	return output_buffer.pop();
+}
+
+#endif
+// MOD Trax END

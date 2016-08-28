@@ -16,6 +16,11 @@ const PROGMEM prog_uchar SPLASH4A_MSG[] = "Heaters are not     ";
 const PROGMEM prog_uchar GO_MSG[] =         "Start Preheating";
 const PROGMEM prog_uchar STOP_MSG[] =       "Turn Heaters OFF";
 const PROGMEM prog_uchar PLATFORM_MSG[] =   "Platform";
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+const PROGMEM prog_uchar ENCLOSURE_MSG[] =  "Enclosure";
+#endif
+// MOD Trax END
 const PROGMEM prog_uchar TOOL_MSG[] =       "Extruder";
 const PROGMEM prog_uchar START_TEST_MSG[]=  "I'm going to print  " "a series of lines so" "we can find my      " "nozzle alignment.   ";
 const PROGMEM prog_uchar EXPLAIN1_MSG[] =   "Look for the best   " "matched line in each" "axis set.  Lines are" "numbered 1-13 and...";
@@ -64,6 +69,11 @@ const PROGMEM prog_uchar BUILD_PERCENT_MSG[] =    " --%";
 const PROGMEM prog_uchar EXTRUDER1_TEMP_MSG[] =   "R Extruder: ---/---C";
 const PROGMEM prog_uchar EXTRUDER2_TEMP_MSG[] =   "L Extruder: ---/---C";
 const PROGMEM prog_uchar PLATFORM_TEMP_MSG[]  =   "Platform:   ---/---C";
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+const PROGMEM prog_uchar ENCLOSURE_TEMP_MSG[] =   "Enclosure:  ---/---C";
+#endif
+// MOD Trax END
 const PROGMEM prog_uchar EXTRUDER_TEMP_MSG[]  =   "Extruder:   ---/---C";
 const PROGMEM prog_uchar FILAMENT_CANCEL_MSG[] =  "Press left to cancel";
 
@@ -72,6 +82,11 @@ const PROGMEM prog_uchar EXTRUDER_SPACES_MSG[]  = "Extruder           ";
 const PROGMEM prog_uchar RIGHT_SPACES_MSG[]     = "Right Extruder     ";
 const PROGMEM prog_uchar LEFT_SPACES_MSG[]      = "Left Extruder      ";
 const PROGMEM prog_uchar PLATFORM_SPACES_MSG[]  = "Platform           ";
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+const PROGMEM prog_uchar ENCLOSURE_SPACES_MSG[] = "Enclosure          ";
+#endif
+// MOD Trax END
 const PROGMEM prog_uchar RESET1_MSG[]           = "Restore factory";
 const PROGMEM prog_uchar RESET2_MSG[]           = "settings?";
 const PROGMEM prog_uchar CANCEL_MSG[] = "Cancel this print?";
@@ -117,6 +132,11 @@ const PROGMEM prog_uchar LED_HEAT_MSG[] =         "Heat LEDs";
 const PROGMEM prog_uchar EXIT_MSG[] =             "Exit Menu";
 const PROGMEM prog_uchar ACCELERATE_MSG[]          = "Acceleration";
 const PROGMEM prog_uchar HBP_MSG[]                 = "HBP installed";
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+const PROGMEM prog_uchar CHE_MSG[]                 = "CHE Enclosure";
+#endif
+// MOD Trax END
 const PROGMEM prog_uchar OVERRIDE_GCODE_TEMP_MSG[] = "Override GcTemp";
 const PROGMEM prog_uchar PAUSE_HEAT_MSG[]	   = "Pause with Heat";
 const PROGMEM prog_uchar EXTRUDER_HOLD_MSG[]       = "Extruder Hold";
@@ -131,6 +151,14 @@ const PROGMEM prog_uchar CHANGE_SPEED_MSG[]        = "Change Speed";
 const PROGMEM prog_uchar CHANGE_TEMP_MSG[]         = "Change Temperature";
 const PROGMEM prog_uchar FAN_ON_MSG[]              = "Set Cooling Fan ON "; // Needs trailing space
 const PROGMEM prog_uchar FAN_OFF_MSG[]             = "Set Cooling Fan OFF";
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+const PROGMEM prog_uchar CHE_ON_MSG[]              = "Heat Enclosure     ";
+const PROGMEM prog_uchar CHE_OFF_MSG[]             = "Dont Heat Enclosure";
+#endif
+const PROGMEM prog_uchar SWAP_TOOLS_MSG[]          = "Swap Toolheads     ";
+const PROGMEM prog_uchar UNSWAP_TOOLS_MSG[]        = "UnSwap Toolheads   ";
+// MOD Trax END
 const PROGMEM prog_uchar RETURN_TO_MAIN_MSG[]      = "Main Menu";
 const PROGMEM prog_uchar PRINT_ANOTHER_MSG[]       = "Print Another Copy";
 const PROGMEM prog_uchar CANNOT_PRINT_ANOTHER_MSG[]= "(Cannot Print Copy)";
@@ -155,6 +183,11 @@ const PROGMEM prog_uchar HEATER_TOOL_MSG[]                 = "Extruder Failure! 
 const PROGMEM prog_uchar HEATER_TOOL0_MSG[]                = "Tool 0 Failure!     ";
 const PROGMEM prog_uchar HEATER_TOOL1_MSG[]                = "Tool 1 Failure!     ";
 const PROGMEM prog_uchar HEATER_PLATFORM_MSG[]             = "Platform Failure!   ";
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+const PROGMEM prog_uchar HEATER_ENCLOSURE_MSG[]             = "Enclosure Failure!  ";
+#endif
+// MOD Trax END
 
 const PROGMEM prog_uchar HEATER_FAIL_SOFTWARE_CUTOFF_MSG[] = "Temp limit reached. " "Shutdown or restart.";
 const PROGMEM prog_uchar HEATER_FAIL_NOT_HEATING_MSG[]     = "Not heating properly" "Check wiring.";
@@ -241,6 +274,15 @@ const PROGMEM prog_uchar MAX_PROBE_HITS_MSG1[]  = "Max Z Probe Hits"; // No more
 const PROGMEM prog_uchar MAX_PROBE_HITS_MSG2[] = "Use 0 for unlimited";
 #endif
 #endif
+
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+const PROGMEM prog_uchar PSTOP_MONITOR_MSG[]  = "PStop Settings";
+const PROGMEM prog_uchar PSTOP_MONITOR_CALIBRATION[]  = "Calibration";
+const PROGMEM prog_uchar PSTOP_MONITOR_TOLERANCE[]  	= "Tolerance";
+const PROGMEM prog_uchar PSTOP_MONITOR_STATUS[]  			= "Test: ";
+#endif
+// MOD Trax END
 
 const PROGMEM prog_uchar MON_ZPOS_MSG[]           = "ZPos:               ";
 

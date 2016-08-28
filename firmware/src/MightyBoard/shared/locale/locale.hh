@@ -22,6 +22,11 @@ extern const unsigned char SPLASH_SRAM_MSG[];
 extern const unsigned char GO_MSG[];
 extern const unsigned char STOP_MSG[];
 extern const unsigned char PLATFORM_MSG[];
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+extern const unsigned char ENCLOSURE_MSG[];
+#endif
+// MOD Trax END
 extern const unsigned char TOOL_MSG[];
 
 #if defined(NOZZLE_CALIBRATION_SCRIPT)
@@ -77,6 +82,11 @@ extern const unsigned char BUILD_PERCENT_MSG[];
 extern const unsigned char EXTRUDER1_TEMP_MSG[];
 extern const unsigned char EXTRUDER2_TEMP_MSG[];
 extern const unsigned char PLATFORM_TEMP_MSG[];
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+extern const unsigned char ENCLOSURE_TEMP_MSG[];
+#endif
+// MOD Trax END
 extern const unsigned char EXTRUDER_TEMP_MSG[];
 extern const unsigned char FILAMENT_CANCEL_MSG[];
 
@@ -84,6 +94,11 @@ extern const unsigned char EXTRUDER_SPACES_MSG[];
 extern const unsigned char RIGHT_SPACES_MSG[];
 extern const unsigned char LEFT_SPACES_MSG[];
 extern const unsigned char PLATFORM_SPACES_MSG[];
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+extern const unsigned char ENCLOSURE_SPACES_MSG[];
+#endif
+// MOD Trax END
 extern const unsigned char RESET1_MSG[];
 extern const unsigned char RESET2_MSG[];
 extern const unsigned char CANCEL_MSG[];
@@ -129,6 +144,11 @@ extern const unsigned char SOUND_MSG[];
 extern const unsigned char EXIT_MSG[];
 extern const unsigned char ACCELERATE_MSG[];
 extern const unsigned char HBP_MSG[];
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+extern const unsigned char CHE_MSG[];
+#endif
+// MOD Trax END
 extern const unsigned char OVERRIDE_GCODE_TEMP_MSG[];
 extern const unsigned char PAUSE_HEAT_MSG[];
 extern const unsigned char EXTRUDER_HOLD_MSG[];
@@ -143,6 +163,14 @@ extern const unsigned char CHANGE_SPEED_MSG[];
 extern const unsigned char CHANGE_TEMP_MSG[];
 extern const unsigned char FAN_ON_MSG[];
 extern const unsigned char FAN_OFF_MSG[];
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+extern const unsigned char CHE_ON_MSG[];
+extern const unsigned char CHE_OFF_MSG[];
+#endif
+extern const unsigned char SWAP_TOOLS_MSG[];
+extern const unsigned char UNSWAP_TOOLS_MSG[];
+// MOD Trax END
 extern const unsigned char RETURN_TO_MAIN_MSG[];
 extern const unsigned char PRINT_ANOTHER_MSG[];
 extern const unsigned char CANNOT_PRINT_ANOTHER_MSG[];
@@ -168,6 +196,11 @@ extern const unsigned char HEATER_TOOL_MSG[];
 extern const unsigned char HEATER_TOOL0_MSG[];
 extern const unsigned char HEATER_TOOL1_MSG[];
 extern const unsigned char HEATER_PLATFORM_MSG[];
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+extern const unsigned char HEATER_ENCLOSURE_MSG[];
+#endif
+// MOD Trax END
 //
 extern const unsigned char HEATER_FAIL_SOFTWARE_CUTOFF_MSG[];
 extern const unsigned char HEATER_FAIL_NOT_HEATING_MSG[];
@@ -254,6 +287,15 @@ extern const unsigned char MAX_PROBE_HITS_MSG1[];
 extern const unsigned char MAX_PROBE_HITS_MSG2[];
 #endif
 #endif
+
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+extern const unsigned char PSTOP_MONITOR_MSG[];
+extern const unsigned char PSTOP_MONITOR_CALIBRATION[];
+extern const unsigned char PSTOP_MONITOR_TOLERANCE[];
+extern const unsigned char PSTOP_MONITOR_STATUS[];
+#endif
+// MOD Trax END
 
 extern const unsigned char MON_ZPOS_MSG[];
 

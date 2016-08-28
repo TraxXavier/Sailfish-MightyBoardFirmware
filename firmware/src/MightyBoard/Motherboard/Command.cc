@@ -82,7 +82,8 @@ uint32_t line_number;
 #endif
 
 #if defined(HEATERS_ON_STEROIDS)
-#if !defined(FF_CREATOR) && !defined(WANHAO_DUP4) && !defined(FF_CREATOR_X)
+#if !defined(FF_CREATOR) && !defined(WANHAO_DUP4) && !defined(FF_CREATOR_X) && !defined(CTC_DUPLICATOR) // MOD Trax
+//#if !defined(FF_CREATOR) && !defined(WANHAO_DUP4) && !defined(FF_CREATOR_X)
 #warning "Building with HEATERS_ON_STEROIDS defined will create firmware which allows ALL heaters to heatup at the same time; this requires a PSU, power connector, and associated electronics capable of handling much higher current loads than the stock Replicators can handle"
 #else
 #warning "Building with HEATERS_ON_STEROIDS defined will create firmware which allows ALL heaters to heatup at the same time; this requires a PSU, power connector, and associated electronics capable of handling much higher current loads than the stock Replicators can handle" 
@@ -110,6 +111,11 @@ static int32_t lastFilamentPosition[2];
 bool pauseUnRetract = false;
 
 int16_t pausedPlatformTemp;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+int16_t pausedEnclosureTemp;
+#endif
+// MOD Trax END
 int16_t pausedExtruderTemp[2];
 uint8_t pausedDigiPots[STEPPER_COUNT] = {0, 0, 0, 0, 0};
 bool pausedFanState;
@@ -126,6 +132,36 @@ bool dittoPrinting = false;
 #endif
 bool deleteAfterUse = true;
 uint16_t altTemp[EXTRUDERS];
+// MOD Trax BEGIN
+uint16_t altTemp_platform;
+#ifdef HAS_ENCLOSURE
+uint16_t altTemp_enclosure;
+#endif
+bool swappedToolheads = false;
+void swapToolheads(bool swap)
+{
+	if(swappedToolheads != swap)
+	{
+		swappedToolheads = swap;
+		
+		// swap back
+		if(currentToolIndex == 1)
+			currentToolIndex = 0;
+		else
+			currentToolIndex = 1;
+		
+		uint16_t t = altTemp[0];
+		altTemp[0] = altTemp[1];
+		altTemp[1] = t;
+		
+		t = pausedExtruderTemp[0];
+		pausedExtruderTemp[0] = pausedExtruderTemp[1];
+		pausedExtruderTemp[1] = t;
+		
+		steppers::changeToolIndex(currentToolIndex);
+	}
+}
+// MOD Trax END
 
 #if defined(CORE_XY) || defined(CORE_XY_STEPPER) || defined(CORE_XYZ)
 static uint8_t  home_command;
@@ -443,6 +479,14 @@ void buildReset() {
 #if EXTRUDERS > 1
 	pausedExtruderTemp[1] = 0;
 #endif
+// MOD Trax BEGIN
+	altTemp_platform = 0;
+#ifdef HAS_ENCLOSURE
+	altTemp_enclosure = 0;
+#endif
+	swappedToolheads = false;
+// MOD Trax END
+
 
 #if defined(CORE_XY) || defined(CORE_XY_STEPPER) || defined(CORE_XYZ)
 	home_again = false;
@@ -724,6 +768,16 @@ static void handleMovementCommand(const uint8_t &command) {
 			}
 #endif
 
+// MOD Trax BEGIN
+			if(swappedToolheads)
+			{
+				int32_t t = a;
+				a = b;
+				b = t;
+			}
+// MOD Trax END
+			
+
 	                filamentLength[0] += (int64_t)(a - lastFilamentPosition[0]);
 			filamentLength[1] += (int64_t)(b - lastFilamentPosition[1]);
 			lastFilamentPosition[0] = a;
@@ -766,6 +820,15 @@ static void handleMovementCommand(const uint8_t &command) {
 				}
 			}
 #endif
+
+// MOD Trax BEGIN
+			if(swappedToolheads)
+			{
+				int32_t t = a;
+				a = b;
+				b = t;
+			}
+// MOD Trax END
 
 			int32_t ab[2] = {a,b};
 
@@ -821,6 +884,15 @@ static void handleMovementCommand(const uint8_t &command) {
 			}
 #endif
 
+// MOD Trax BEGIN
+			if(swappedToolheads)
+			{
+				int32_t t = a;
+				a = b;
+				b = t;
+			}
+// MOD Trax END
+
 			int32_t ab[2] = {a,b};
 
 			for ( int i = 0; i < 2; i ++ ) {
@@ -853,9 +925,19 @@ bool processExtruderCommandPacket(int8_t overrideToolIndex) {
 	Motherboard& board = Motherboard::getBoard();
 		//command_buffer[0] is the command code, i.e. HOST_CMD_TOOL_COMMAND
 
-                //Handle the tool index and override it if we need to
-                uint8_t toolIndex = command_buffer[1];
-                if ( overrideToolIndex != -1 )  toolIndex = (uint8_t)overrideToolIndex;
+    //Handle the tool index and override it if we need to
+    uint8_t toolIndex = command_buffer[1];
+    if ( overrideToolIndex != -1 )  toolIndex = (uint8_t)overrideToolIndex;
+
+// MOD Trax BEGIN
+		if(toolIndex)
+		{
+			if(toolIndex == 1)
+				toolIndex = 0;
+			else
+				toolIndex = 1;
+		}
+// MOD Trax END
 
 		uint8_t command = command_buffer[2];
 		//command_buffer[3] - Payload length
@@ -909,10 +991,15 @@ bool processExtruderCommandPacket(int8_t overrideToolIndex) {
 			temp = 0;
 #endif
 			/// Handle override gcode temp
-			if (( temp ) && ( eeprom::getEeprom8(eeprom_offsets::OVERRIDE_GCODE_TEMP, 0) )) {
+// MOD Trax BEGIN
+			if (( temp ) && ( altTemp_platform ||
+				     ( eeprom::getEeprom8(eeprom_offsets::OVERRIDE_GCODE_TEMP, 0)) ))
+				temp = altTemp_platform ? altTemp_platform : eeprom::getEeprom16(eeprom_offsets::PREHEAT_SETTINGS + preheat_eeprom_offsets::PREHEAT_PLATFORM_TEMP, 100);
+// MOD Trax END
+			/*if (( temp ) && ( eeprom::getEeprom8(eeprom_offsets::OVERRIDE_GCODE_TEMP, 0) )) {
 				temp = eeprom::getEeprom16(eeprom_offsets::PREHEAT_SETTINGS + preheat_eeprom_offsets::PREHEAT_PLATFORM_TEMP, 100);
-			}
-
+			}*/
+	
 			board.getPlatformHeater().set_target_temperature(temp);
 
 			// If we're setting the platform temp to 0 (off) then it's tempting to
@@ -932,6 +1019,31 @@ bool processExtruderCommandPacket(int8_t overrideToolIndex) {
 #endif
 			BOARD_STATUS_CLEAR(Motherboard::STATUS_PREHEATING);			
 			return true;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		case SLAVE_CMD_SET_ENCLOSURE_TEMP:
+			if ( !eeprom::hasCHE() ) return true;
+			temp = (int16_t)command_buffer[4] + (int16_t)( command_buffer[5] << 8 );
+#ifdef DEBUG_NO_HEAT_NO_WAIT
+			temp = 0;
+#endif
+			/// Handle override gcode temp
+			if (( temp ) && ( altTemp_enclosure ||
+				     ( eeprom::getEeprom8(eeprom_offsets::OVERRIDE_GCODE_TEMP, 0)) ))
+				temp = altTemp_enclosure ? altTemp_enclosure : eeprom::getEeprom16(eeprom_offsets::PREHEAT_ENCLOSURE_TEMP, DEFAULT_PREHEAT_CHE);
+	
+			board.getEnclosureHeater().set_target_temperature(temp);
+
+
+			board.setUsingEnclosure(true);
+#if !defined(HEATERS_ON_STEROIDS)
+			// enclosure heater is ron of mains so its has all the power it can ever need
+#else
+#endif
+			BOARD_STATUS_CLEAR(Motherboard::STATUS_PREHEATING);
+			return true;
+#endif
+// MOD Trax END
         // not being used with 5D
 		case SLAVE_CMD_TOGGLE_MOTOR_1:
 		case SLAVE_CMD_TOGGLE_MOTOR_2: 
@@ -1011,6 +1123,11 @@ void handlePauseState(void) {
 		    pausedExtruderTemp[0] = (int16_t)board.getExtruderBoard(0).getExtruderHeater().get_set_temperature();
 		    pausedExtruderTemp[1] = (int16_t)board.getExtruderBoard(1).getExtruderHeater().get_set_temperature();
 		    pausedPlatformTemp    = (int16_t)board.getPlatformHeater().get_set_temperature();
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		    pausedEnclosureTemp    = (int16_t)board.getEnclosureHeater().get_set_temperature();
+#endif
+// MOD Trax END
 
 		    //If we're pausing, and we have HEAT_DURING_PAUSE switched off, switch off the heaters
 		    //if (( ! cancelling ) && ( ! (eeprom::getEeprom8(eeprom_offsets::HEAT_DURING_PAUSE, DEFAULT_HEAT_DURING_PAUSE) )))
@@ -1055,6 +1172,15 @@ void handlePauseState(void) {
 			board.getPlatformHeater().Pause(false);
 			board.getPlatformHeater().set_target_temperature(pausedPlatformTemp);
 		}
+		
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		if ( pausedEnclosureTemp > 0 ) {
+			board.getEnclosureHeater().Pause(false);
+			board.getEnclosureHeater().set_target_temperature(pausedEnclosureTemp);
+		}
+#endif
+// MOD Trax END
 
 		int16_t temp = altTemp[0] ? (int16_t)altTemp[0] : pausedExtruderTemp[0];
 		if ( temp > 0 ) {
@@ -1083,6 +1209,12 @@ void handlePauseState(void) {
 		//Waiting for the platform heater to reach it's set point
 		if (( pausedPlatformTemp > 0 ) && ( ! Motherboard::getBoard().getPlatformHeater().has_reached_target_temperature() ))
 			break;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		if (( pausedEnclosureTemp > 0 ) && ( ! Motherboard::getBoard().getEnclosureHeater().has_reached_target_temperature() ))
+			break;
+#endif
+// MOD Trax END
 		paused = PAUSE_STATE_EXIT_WAIT_FOR_TOOLHEAD_HEATERS;
 		break;
 
@@ -1321,6 +1453,11 @@ void runCommandSlice() {
 	}
 
 	if ( mode == WAIT_ON_PLATFORM ) {
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		// X-TODO
+#endif
+// MOD Trax END
 		if ( tool_wait_timeout.hasElapsed() ) {
 			Motherboard::getBoard().errorResponse(PLATFORM_TIMEOUT_MSG);
 			mode = READY;		
@@ -1395,6 +1532,15 @@ void runCommandSlice() {
 				if (command_buffer.getLength() >= 2) {
 					pop8(); // remove the command code
                     currentToolIndex = pop8();
+// MOD Trax BEGIN
+										if(swappedToolheads)
+										{
+											if(currentToolIndex == 1)
+												currentToolIndex = 0;
+											else
+												currentToolIndex = 1;
+										}
+// MOD Trax END
                     LINE_NUMBER_INCR;
                     
                     steppers::changeToolIndex(currentToolIndex);
@@ -1418,6 +1564,19 @@ void runCommandSlice() {
 						}
 					}
 #endif
+
+// MOD Trax BEGIN
+					if(swappedToolheads)
+					{
+						uint8_t t = axes; // temp value
+						axes &= ~(_BV(A_AXIS) | _BV(B_AXIS)); // clear booth
+						if((t & _BV(A_AXIS)) != 0) // if A set B
+							axes |= _BV(B_AXIS);
+						if((t & _BV(B_AXIS)) != 0) // if B set A
+							axes |= _BV(A_AXIS);
+					}
+// MOD Trax END
+
 					steppers::enableAxes(axes, (axes & 0x80) != 0);
 				}
 			} else if (command == HOST_CMD_SET_POSITION_EXT) {
@@ -1436,6 +1595,15 @@ void runCommandSlice() {
 						else				a = b;
 					}
 #endif
+
+// MOD Trax BEGIN
+					if(swappedToolheads)
+					{
+						int32_t t = a;
+						a = b;
+						b = t;
+					}
+// MOD Trax END
 
 					lastFilamentPosition[0] = a;
 					lastFilamentPosition[1] = b;
@@ -1573,6 +1741,15 @@ void runCommandSlice() {
 #endif
 					pop8();
 					currentToolIndex = pop8();
+// MOD Trax BEGIN
+					if(swappedToolheads)
+					{
+						if(currentToolIndex == 1)
+							currentToolIndex = 0;
+						else
+							currentToolIndex = 1;
+					}
+// MOD Trax END
 					pop16();	//uint16_t toolPingDelay
 					uint16_t toolTimeout = (uint16_t)pop16();
 					LINE_NUMBER_INCR;

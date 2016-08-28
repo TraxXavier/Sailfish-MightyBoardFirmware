@@ -84,7 +84,7 @@ public:
         /// Note that the current implementation only supports one button
         /// press at a time, and will discard any other events.
         /// \param button Button that was pressed
-        virtual void notifyButtonPressed(ButtonArray::ButtonName button) = 0;
+	virtual void notifyButtonPressed(ButtonArray::ButtonName button) = 0;
 
 	uint8_t optionsMask;	// Bits:
 				// 0 = CENTER (continuous buttons)
@@ -131,6 +131,7 @@ protected:
         uint8_t firstItemIndex;         ///< The first selectable item. Set this
                                         ///< to greater than 0 if the first
                                         ///< item(s) are a title)
+        uint8_t lastItemIndex; // MOD Trax // X-ToDo
 
         /// Draw an item at the current cursor position.
         /// \param[in] index Index of the item to draw
@@ -330,6 +331,31 @@ public:
 
 #endif // AUTO_LEVEL
 
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+class PStopSettingsMenu: public CounterMenu {
+
+public:
+        PStopSettingsMenu();
+
+protected:
+	uint16_t counterEnable;
+	uint16_t counterTolerance;
+	float counterCalibration;
+
+	void resetState();
+
+	micros_t getUpdateRate() {return 50L * 1000L;}
+
+	void drawItem(uint8_t index, LiquidCrystalSerial& lcd);
+
+	void handleSelect(uint8_t index);
+
+	void handleCounterUpdate(uint8_t index, int8_t up);
+};
+#endif
+// MOD Trax END
+
 class ChangeSpeedScreen: public Screen {
 
 private:
@@ -352,14 +378,19 @@ class ChangeTempScreen: public Screen {
 
 private:
         uint8_t activeToolhead;
+        // MOD Trax BEGIN
+        uint8_t updateToolhead;
+        // MOD Trax END
         uint16_t altTemp;
 
         void getTemp();
 
 public:
-        ChangeTempScreen() : Screen(_BV((uint8_t)ButtonArray::UP) | _BV((uint8_t)ButtonArray::DOWN)) {}
+        //ChangeTempScreen() : Screen(_BV((uint8_t)ButtonArray::UP) | _BV((uint8_t)ButtonArray::DOWN)) {}
+		    ChangeTempScreen() : Screen(_BV((uint8_t)ButtonArray::UP) | _BV((uint8_t)ButtonArray::DOWN) | _BV((uint8_t)ButtonArray::RIGHT)) {} // MOD Trax
 
-	micros_t getUpdateRate() {return 50L * 1000L;}
+	//micros_t getUpdateRate() {return 50L * 1000L;}
+	micros_t getUpdateRate() {return 250L * 1000L;} // MOD Trax
 
         void update(LiquidCrystalSerial& lcd, bool forceRedraw);
 
@@ -394,6 +425,12 @@ class ActiveBuildMenu: public Menu {
 private:
 	//Fan ON/OFF
 	bool fanState;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	bool cheState;
+#endif
+	bool toolSwap;
+// MOD Trax END
 	bool is_hot;
 	bool is_heating;
 	uint8_t is_paused;
@@ -600,6 +637,11 @@ protected:
 	uint16_t counterRight;
 	uint16_t counterLeft;
 	uint16_t counterPlatform;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	uint16_t counterEnclosure;
+#endif
+// MOD Trax END
 	uint8_t offset;
 
 	void resetState();
@@ -727,9 +769,16 @@ class MonitorModeScreen: public Screen {
 
 private:
 	uint8_t updatePhase;
+// MOD Trax BEGIN
+	uint8_t curScreen;
+	uint8_t updScreen;
+#define MON_SCR_COUNT 3
+// MOD Trax END
 	bool heating;
 
 #if defined(BUILD_STATS) || defined(MODEL_REPLICATOR2)
+	// MOD Trax REM:
+	/*
 	enum BuildTimePhase {
 		BUILD_TIME_PHASE_FIRST = 0,
 		BUILD_TIME_PHASE_ELAPSED_TIME = BUILD_TIME_PHASE_FIRST,
@@ -742,11 +791,14 @@ private:
 		BUILD_TIME_PHASE_LAST	//Not counted, just an end marker
 	};
 
+	
 	enum BuildTimePhase buildTimePhase, lastBuildTimePhase;
-        uint32_t lastElapsedSeconds;
+  */
+  uint32_t lastElapsedSeconds;
 #endif
 
 public:
+
 	micros_t getUpdateRate() {return 500L * 1000L;}
 
 	void update(LiquidCrystalSerial& lcd, bool forceRedraw);
@@ -769,6 +821,11 @@ public:
 
 private:
 	int8_t _rightActive, _leftActive, _platformActive;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	int8_t _enclosureActive;
+#endif
+// MOD Trax END
 
 	void storeHeatByte();
 	void resetState();

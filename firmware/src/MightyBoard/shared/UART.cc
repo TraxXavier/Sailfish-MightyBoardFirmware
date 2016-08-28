@@ -46,6 +46,12 @@ volatile uint8_t loopback_bytes = 0;
 #error Cannot use 2nd UART for both HAS_SLAVE_UART and ALTERNATE_UART
 #endif
 
+// MOD Trax BEGIN
+#if defined(UART_DEBUG) && (defined(ALTERNATE_UART) || HAS_SLAVE_UART != 0)
+#error Cannot use 2nd UART for both UART_DEBUG and ALTERNATE_UART or HAS_SLAVE_UART
+#endif
+// MOD END
+
 // We support three platforms: Atmega168 (1 UART), Atmega644, and
 // Atmega1280/2560
 #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega328__) ||                \
@@ -92,7 +98,8 @@ volatile uint8_t loopback_bytes = 0;
 
 // Use double-speed mode for more accurate baud rate?
 #define UBRR0_VALUE 16 // 115200 baud
-#ifdef ALTERNATE_UART
+//#ifdef ALTERNATE_UART
+#if defined(ALTERNATE_UART) || defined(UART_DEBUG) // MOD Trax
 // Alternate UART uses 115200 on both UARTS
 #define UBRR1_VALUE 16 // 115200 baud
 #else
@@ -155,6 +162,12 @@ void UART::init_serial() {
     INIT_SERIAL(1);
   }
 #endif
+
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+	INIT_SERIAL(1);
+#endif
+// MOD Trax END
 }
 
 void UART::send_byte(char data) {
@@ -167,6 +180,14 @@ void UART::send_byte(char data) {
   }
 #endif
 }
+
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+void UART::print_byte(char data) {
+  UDR1 = data;
+}
+#endif
+// MOD Trax END
 
 #if HAS_SLAVE_UART
 // Transition to a non-transmitting state. This is only used for RS485 mode.
@@ -231,6 +252,154 @@ void UART::beginSend() {
   send_byte(out.getNextByteToSend());
 }
 
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+
+#define DBG_STOR_STARE \
+	cli(); \
+	bool begin = !dbg_out.isSending();
+
+#define DBG_START_SEND \
+	if(begin) \
+		beginPrint(); \
+	sei();
+
+void UART::printPStr(const prog_uchar pstr[])
+{
+	DBG_STOR_STARE
+	dbg_out.appendPStr(pstr);
+	DBG_START_SEND
+}
+
+void UART::printString(const char* str)
+{
+	DBG_STOR_STARE
+	dbg_out.appendStr(str);
+	DBG_START_SEND
+}
+
+#define MAX_NUM_STR_LEN 20
+
+void UART::printInt(uint16_t value, uint8_t digits) {
+
+    if(digits > 5)
+        digits = 5;
+    printInt32(value, digits);
+}
+
+void UART::printInt32(uint32_t value, uint8_t digits) {
+
+     uint32_t currentDigit = 1;
+     uint32_t nextDigit;
+     bool nonzero_seen = false;
+
+	uint8_t p = 0;
+	char str[MAX_NUM_STR_LEN + 1];
+
+     if ( digits > 9 )
+	  digits = 9;
+
+     for (uint8_t i = digits; i; i--)
+	  currentDigit *= 10;
+
+     for (uint8_t i = digits; i; i--) {
+	  nextDigit = currentDigit / 10;
+	  char c;
+	  int8_t d = (value % currentDigit) / nextDigit;
+	  if ( nonzero_seen || d != 0 || i == 1) {
+	       c = d + '0';
+	       nonzero_seen = true;
+	  }
+	  else
+	       c = ' ';
+	  str[p++] = c;
+	  currentDigit = nextDigit;
+     }
+     
+	str[p] = '\0';
+
+	printString(str);
+}
+
+//From: http://www.arduino.cc/playground/Code/PrintFloats
+//tim [at] growdown [dot] com   Ammended to write a float to lcd
+//If rightJusityToCol = 0, the number is left justified, i.e. printed from the
+//current cursor position.  If it's non-zero, it's right justified to end at rightJustifyToCol column.
+
+void UART::printFloat(float value, uint8_t decimalPlaces) {
+        // this is used to cast digits
+        int digit;
+        float tens = 0.1;
+        int tenscount = 0;
+        int i;
+        float tempfloat = value;
+	uint8_t p = 0;
+	char str[MAX_NUM_STR_LEN + 1];
+
+        // make sure we round properly. this could use pow from <math.h>, but doesn't seem worth the import
+        // if this rounding step isn't here, the value  54.321 prints as 54.3209
+
+        // calculate rounding term d:   0.5/pow(10,decimalPlaces)
+        float d = 0.5;
+        if (value < 0) d *= -1.0;
+
+        // divide by ten for each decimal place
+        for (i = decimalPlaces; i; i--) d/= 10.0;
+
+        // this small addition, combined with truncation will round our values properly
+        tempfloat +=  d;
+
+        // first get value tens to be the large power of ten less than value
+        // tenscount isn't necessary but it would be useful if you wanted to know after this how many chars the number will take
+
+        tempfloat = fabsf(tempfloat);
+        while ((tens * 10.0) <= tempfloat) {
+                tens *= 10.0;
+                tenscount += 1;
+        }
+
+        // write out the negative if needed
+        if (value < 0) str[p++] = '-';
+
+        if (tenscount == 0) str[p++] = '0';
+
+        for (i = tenscount; i; i--) {
+                digit = (int) (tempfloat/tens);
+                str[p++] = digit + '0';
+                tempfloat = tempfloat - ((float)digit * tens);
+                tens /= 10.0;
+        }
+
+        // if no decimalPlaces after decimal, stop now and return
+        if (decimalPlaces > 0) {
+		// otherwise, write the point and continue on
+		str[p++] = '.';
+
+		// now write out each decimal place by shifting digits one by one into the ones place and writing the truncated value
+		for (i = decimalPlaces; i; i--) {
+			tempfloat *= 10.0;
+			digit = (int) tempfloat;
+			str[p++] = digit+'0';
+			// once written, subtract off that digit
+			tempfloat = tempfloat - (float) digit;
+		}
+	}
+
+	str[p] = '\0';
+
+	printString(str);
+}
+
+void UART::beginPrint() {
+  if (!enabled_) {
+    return;
+  }
+
+  print_byte(dbg_out.getNextByteToSend());
+}
+#endif
+// MOD Trax END
+
 void UART::enable(bool enabled) {
   enabled_ = enabled;
   if (index_ == 0) {
@@ -249,6 +418,16 @@ void UART::enable(bool enabled) {
     }
   }
 #endif
+
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+  if (enabled) {
+    ENABLE_SERIAL_INTERRUPTS(1);
+  } else {
+    DISABLE_SERIAL_INTERRUPTS(1);
+  }
+#endif
+// MOD Trax END
 
 #if HAS_SLAVE_UART
   if (mode_ == RS485) {
@@ -327,6 +506,18 @@ ISR(USART1_TX_vect) {
   }
 }
 #endif
+
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+ISR(USART1_RX_vect) { UART::getHostUART().dbg_in.processByte(UDR1); }
+
+ISR(USART1_TX_vect) {
+  if (UART::getHostUART().dbg_out.isSending()) {
+    UDR1 = UART::getHostUART().dbg_out.getNextByteToSend();
+  }
+}
+#endif
+// MOD Trax END
 
 #if HAS_SLAVE_UART
 ISR(USART1_RX_vect) {

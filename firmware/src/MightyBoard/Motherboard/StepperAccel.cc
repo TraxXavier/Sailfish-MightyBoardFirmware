@@ -647,6 +647,14 @@ bool st_interrupt() {
 
 #ifdef JKN_ADVANCE
 
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+// Note: we need to monitor the filament feed in real time...
+volatile int16_t steps_R = 0;
+volatile int16_t steps_L = 0;
+#endif
+// MOD Trax END
+
 void st_extruder_interrupt()
 {
 	uint8_t i;
@@ -668,11 +676,21 @@ void st_extruder_interrupt()
 			stepperAxisSetDirection(A_AXIS, false);
 			e_steps[0]++;
 			stepperAxisStep(A_AXIS, true);
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+			steps_R++;
+#endif
+// MOD Trax END
 		}
 		else if (e_steps[0] > 0) {
 			stepperAxisSetDirection(A_AXIS, true);
 			e_steps[0]--;
 			stepperAxisStep(A_AXIS, true);
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+			steps_R--;
+#endif
+// MOD Trax END
 		}
 
 		st_extruder_interrupt_rate_counter[0] = 0;
@@ -689,11 +707,21 @@ void st_extruder_interrupt()
 			stepperAxisSetDirection(B_AXIS, false);
 			e_steps[1]++;
 			stepperAxisStep(B_AXIS, true);
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+			steps_L++;
+#endif
+// MOD Trax END
 		}
 		else if (e_steps[1] > 0) {
 			stepperAxisSetDirection(B_AXIS, true);
 			e_steps[1]--;
 			stepperAxisStep(B_AXIS, true);
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+			steps_L--;
+#endif
+// MOD Trax END
 		}
 
 		st_extruder_interrupt_rate_counter[1] = 0;

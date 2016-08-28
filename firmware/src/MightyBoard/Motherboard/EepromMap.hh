@@ -390,6 +390,34 @@ const static uint16_t FREE_EEPROM_STARTS        = 0x020C;
 
 //Sailfish specific settings work backwards from the end of the eeprom 0xFFF
 
+// MOD Trax BEGIN
+//enclosure histeresis (2 byte)
+//$BEGIN_ENTRY
+//$type:H $constraints:m,0,75 $unit:C
+//const static uint16_t PREHEAT_ENCLOSURE_HYSTERESIS	= 0x0F5C;
+
+//enclosure preeheet (2 byte)
+//$BEGIN_ENTRY
+//$type:H $constraints:m,0,75 $unit:C
+const static uint16_t PREHEAT_ENCLOSURE_TEMP			= 0x0F5E;
+
+/// Enclosure Present or not (i byte)
+//$BEGIN_ENTRY
+//$type:B $constraints:l,0,1 $tooltip:Check or set to 1 if this machine has a heated enclosure; otherwise, uncheck or set to 0 if it does not.  The bot should be power cycled after changing this field.
+const static uint16_t CHE_PRESENT			= 0x0F5F;
+
+//P-Stop monitor callibration (2 byte)
+//$BEGIN_ENTRY
+//$type:H $floating_point:True $constraints:a  $tooltip:Filament encoder pulse to steps calibration.
+const static uint16_t PSTOP_CALIBRATION   = 0x0F60;
+
+//P-Stop monitor tolerance (1 byte)
+//$BEGIN_ENTRY
+//$type:B $constraints:m,0,100 $tooltip:P-Stop filament monitor tolerance in percent.
+const static uint16_t PSTOP_TOLERANCE   = 0x0F62;
+// MOD Trax END
+
+
 //Fan PWM level (0 - 100)
 //$BEGIN_ENTRY
 //$type:B $constraints:l,0,100 $tooltip:Set a blower strength (duty cycle) to use for the print cooling fan when it is activated by the print commands.  Select a value between 0% (off) and 100% (on full).  For example, if your fan is too strong, you may want to set this value to 50 so that the fan operates at 50% strength.  If set this value to 0, then the cooling fan will not activate at all when the print commands request it to.
@@ -475,6 +503,11 @@ const static uint16_t DITTO_PRINT_ENABLED       = 0x0FFF;
 #define DEFAULT_OVERRIDE_GCODE_TEMP     0
 #define DEFAULT_PREHEAT_TEMP            230
 #define DEFAULT_PREHEAT_HBP             100
+// MOD Trax BEGIN
+#define DEFAULT_PREHEAT_CHE             50
+#define PSTOP_DEFAULT_TOLERANCE					20
+//#define DEFAULT_ENCLOSURE_HYSTERESIS    2
+// MOD Trax END
 #define DEFAULT_HEAT_DURING_PAUSE       0
 
 #define DEFAULT_MAX_ACCELERATION_AXIS_X 1000
@@ -621,6 +654,11 @@ const static uint16_t PREHEAT_ON_OFF_OFFSET             = 0x06;
  */
 enum HeatMask{
     HEAT_MASK_PLATFORM = 0,
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		HEAT_MASK_ENCLOSURE = 3,
+#endif
+// MOD Trax END
     HEAT_MASK_LEFT = 1,
     HEAT_MASK_RIGHT = 2
 };
@@ -700,6 +738,11 @@ namespace eeprom {
     void setCustomColor(uint8_t red, uint8_t green, uint8_t blue);
     bool isSingleTool();
     bool hasHBP();
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+    bool hasCHE();
+#endif
+// MOD Trax END
     void setDefaultsAcceleration();
     void storeToolheadToleranceDefaults();
     void updateBuildTime(uint16_t new_hours, uint8_t new_minutes);

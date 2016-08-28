@@ -141,7 +141,13 @@ void Heater::disable(bool on) {
 void Heater::set_target_temperature(int16_t target_temp)
 {
        // clip our set temperature if we are over temp.
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	int16_t maxtemp = (calibration_eeprom_offset == 2 ) ? MAX_HBP_TEMP : (calibration_eeprom_offset == 3) ? MAX_CHE_TEMP : MAX_VALID_TEMP;
+#else
+// MOD Trax END
 	int16_t maxtemp = (calibration_eeprom_offset == 2) ? MAX_HBP_TEMP : MAX_VALID_TEMP;
+#endif // MOD Trax
 	if ( target_temp > maxtemp )
 		target_temp = maxtemp;
 	else if ( target_temp < 0 )

@@ -79,6 +79,15 @@ extern bool dittoPrinting;
 
 extern uint16_t altTemp[EXTRUDERS];
 extern int16_t pausedExtruderTemp[2];
+// MOD Trax BEGIN
+extern uint16_t altTemp_platform;
+#ifdef HAS_ENCLOSURE
+extern uint16_t altTemp_enclosure;
+#endif
+
+extern bool swappedToolheads;
+void swapToolheads(bool swap);
+// MOD Trax END
 
 /// Reset the entire command queue.  Clears out any remaining queued
 /// commands.

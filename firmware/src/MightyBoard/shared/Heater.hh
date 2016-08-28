@@ -27,6 +27,11 @@
 
 #define MAX_VALID_TEMP 280
 #define MAX_HBP_TEMP   130
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+#define MAX_CHE_TEMP	 75
+#endif
+// MOD Trax END
 
 #define DEFAULT_P 7.0
 #define DEFAULT_I 0.325

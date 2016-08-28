@@ -49,6 +49,11 @@
 // Enable the P-Stop (pause stop) support
 #define PSTOP_SUPPORT
 
+// MOD Trax BEGIN
+#ifdef PSTOP_SUPPORT
+#define PSTOP_MONITOR 0x10 // TWI address
+#endif
+// MOD Trax END
 // --- Power Supply Unit configuration ---
 // Define as 1 if a PSU is present; 0 if not.
 #define HAS_PSU         0
@@ -105,8 +110,10 @@
 #define X_STEPPER_MIN           STEPPER_PORT(L,0)	//active high
 #define X_STEPPER_MAX           STEPPER_PORT(L,1)	//active high
 
+#if !defined(PSTOP_MONITOR) // MOD Trax
 // P-Stop is X_STEPPER_MIN = PL0 / ICP4
 #define PSTOP_PORT  Pin(PortL,0)
+#endif
 #ifdef PSTOP_VECT
 #undef PSTOP_VECT
 #endif
@@ -239,6 +246,16 @@
 #define EXTRA_FET               Pin(PortL,5)
 
 #define ACTIVE_COOLING_FAN
+
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+
+#define ENCLOSURE_PIN           14
+
+#define CHE_HEAT                Pin(PortG,0)
+
+#endif
+// MOD Trax END
 
 // sample intervals for heaters
 #define SAMPLE_INTERVAL_MICROS_THERMISTOR (250L * 1000L)

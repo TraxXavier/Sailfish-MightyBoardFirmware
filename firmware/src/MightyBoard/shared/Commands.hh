@@ -162,6 +162,14 @@
 #define SLAVE_CMD_GET_PID_STATE         37
 #define SLAVE_CMD_LIGHT_INDICATOR_LED   40
 
+// MOD Trax BEGIN
+// Let the new commands go down from 0x7F to avoind conflicts if new original once are added
+#ifdef HAS_ENCLOSURE
+#define SLAVE_CMD_GET_ENCLOSURE_TEMP		126
+#define SLAVE_CMD_SET_ENCLOSURE_TEMP		127
+#endif
+// MOD Trax END
+
 enum SoftwareVariant{
   VARIANT_NONE = 0,
   MBI_OFFICIAL = 1,

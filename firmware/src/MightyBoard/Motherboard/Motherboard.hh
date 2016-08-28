@@ -64,6 +64,15 @@ public:
 	void setHeatingElement(uint8_t value);
 };
 
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+class BuildEnclosureHeatingElement : public HeatingElement {
+public:
+	void setHeatingElement(uint8_t value);
+};
+#endif
+// MOD Trax END
+
 
 extern uint8_t board_status;
 #define BOARD_STATUS_SET(x) ( board_status |= (x) )
@@ -120,6 +129,12 @@ private:
 	Timeout extruder_manage_timeout;
 	Timeout platform_timeout;
 
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	Timeout enclosure_timeout;
+#endif
+// MOD Trax END
+
         /// True if we have an interface board attached
 	bool hasInterfaceBoard;
 
@@ -141,6 +156,13 @@ public:
 	Thermistor platform_thermistor;
 	Heater platform_heater;
 	bool using_platform;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	bool using_enclosure;
+	Thermistor enclosure_thermistor;
+	Heater enclosure_heater;
+#endif
+// MOD Trax END
 	
 	ExtruderBoard Extruder_One;
 	ExtruderBoard Extruder_Two;
@@ -158,6 +180,11 @@ public:
 #endif
 	
 	BuildPlatformHeatingElement platform_element;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	BuildEnclosureHeatingElement enclosure_element;
+#endif
+// MOD Trax END
 
 	bool buttonWait;
 	bool reset_request;
@@ -209,6 +236,13 @@ public:
 	void setUsingPlatform(bool is_using);
 	static void setExtra(bool on);
 	Heater& getPlatformHeater() { return platform_heater; }
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	bool isUsingEnclosure() { return using_enclosure; }
+	void setUsingEnclosure(bool is_using);
+	Heater& getEnclosureHeater() { return enclosure_heater; }
+#endif
+// MOD Trax END
 
 	InterfaceBoard& getInterfaceBoard() { return interfaceBoard; }	
 
@@ -225,6 +259,34 @@ public:
 	/// void setBoardStatus(status_states state, bool on);
 
 	void HeatingAlerts();
+	
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+#define ACC_INTER 2
+#define LIST_ACC 3
+#define LIST_LENGTH 5
+	
+	float pstop_enc_calibr;
+	float pstop_tolerance;
+	
+	micros_t last_seconds;
+	
+	int32_t list_enc_R[LIST_LENGTH];
+	int32_t list_step_R[LIST_LENGTH];
+
+	int32_t list_enc_L[LIST_LENGTH];
+	int32_t list_step_L[LIST_LENGTH];
+	
+	int8_t acc_counter;
+	int8_t list_pos;
+	int8_t wait_counter;
+	
+	bool was_building;
+	
+	float pstop_test_R;
+	float pstop_test_L;
+#endif
+// MOD Trax END
 };
 
 #endif // BOARDS_MB40_MOTHERBOARD_HH_

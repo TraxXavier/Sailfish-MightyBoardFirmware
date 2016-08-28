@@ -174,4 +174,34 @@ public:
 	void append32(uint32_t value);
 };
 
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+
+#include "CircularBuffer.hh"
+#include <avr/pgmspace.h>
+
+class Stream{
+	
+};
+
+class InStream: public Stream {
+public:
+	void processByte(uint8_t b) {}
+	
+};
+
+class OutStream: public Stream {
+public:
+	void appendPStr(const prog_uchar pstr[]);
+	void appendStr(const char* str);
+
+	bool isSending() const;
+	
+	uint8_t getNextByteToSend();
+
+};
+
+#endif
+// MOD Trax END
+
 #endif // SHARED_PACKET_HH_

@@ -32,6 +32,10 @@ const static PROGMEM prog_uchar SPLASH1_MSG[] = "Sailfish Rep CoreXYs";
 const static PROGMEM prog_uchar SPLASH1_MSG[] = "Sailfish Rep1 CoreXY";
 #elif defined(CORE_XYZ)
 const static PROGMEM prog_uchar SPLASH1_MSG[] = "Sailfish R1 CoreXYZ ";
+// MOD Trax BEGIN
+#elif defined(CTC_DUPLICATOR)
+const static PROGMEM prog_uchar SPLASH1_MSG[] = "   CTC Duplicator   ";
+// MOD Trax END
 #else
 const static PROGMEM prog_uchar SPLASH1_MSG[] = "Sailfish Replicator1";
 #endif
@@ -53,13 +57,19 @@ const static PROGMEM prog_uchar SPLASH2_MSG[] = "-- Heater Special --";
 #endif
 
 #if defined(__AVR_ATmega2560__)
-const static PROGMEM prog_uchar SPLASH3_MSG[] = "ATmega 2560 " DATE_STR;
+const static PROGMEM prog_uchar SPLASH3_MSG[] = "ATmega 2560";
 #else
-const static PROGMEM prog_uchar SPLASH3_MSG[] = "ATmega 1280 " DATE_STR;
+const static PROGMEM prog_uchar SPLASH3_MSG[] = "ATmega 1280";
 #endif
 
-const static PROGMEM prog_uchar SPLASH4_MSG[] = "Sailfish v" VERSION_STR " r" SVN_VERSION_STR;
+const static PROGMEM prog_uchar SPLASH4_MSG[] = "Sailfish v7.7 MOD";
 
 #include "locale.hh"
+
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+const static PROGMEM prog_uchar DBG_READY_MSG[] = "Duplicator ready...\r\n";
+#endif
+// MOD Trax END
 
 #endif // __MENU__LOCALES__

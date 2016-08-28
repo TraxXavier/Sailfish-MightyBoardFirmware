@@ -899,6 +899,13 @@ bool processExtruderQueryPacket(const InPacket& from_host, OutPacket& to_host) {
 		case SLAVE_CMD_GET_PLATFORM_TEMP:
 			to_host.append16(board.getPlatformHeater().get_current_temperature());
 			return true;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		case SLAVE_CMD_GET_ENCLOSURE_TEMP:
+			to_host.append16(board.getEnclosureHeater().get_current_temperature());
+			return true;
+#endif
+// MOD Trax END
 		case SLAVE_CMD_GET_SP:
 			to_host.append16(board.getExtruderBoard(id).getExtruderHeater().get_set_temperature());
 			return true;

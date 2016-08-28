@@ -49,6 +49,11 @@ uint8_t lastFileIndex = 255;
 bool ready_fail = false;
 static bool singleTool = false;
 static bool hasHBP = true;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+static bool hasCHE = true;
+#endif
+// MOD Trax END
 static bool jog_paused;
 
 #define DUMP_FILE "eeprom_dump.bin"
@@ -99,6 +104,13 @@ MaxZDiffScreen                alevelZDiffScreen;
 MaxZProbeHitsScreen           maxZProbeHitsScreen;
 #endif
 #endif
+
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+PStopSettingsMenu      				pStopSettingsMenu;
+#endif
+// MOD Trax END
+
 
 #ifndef SINGLE_EXTRUDER
 #ifdef NOZZLE_CALIBRATION_SCREEN
@@ -333,18 +345,35 @@ void SplashScreen::reset() {
 }
 
 HeaterPreheatMenu::HeaterPreheatMenu() :
-	Menu(0, (uint8_t)4) {
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	Menu(0, (uint8_t)5)
+#else
+// MOD Trax END
+	Menu(0, (uint8_t)4) 
+#endif // MOD Trax
+{
 	reset();
 }
 
 void HeaterPreheatMenu::resetState(){
 	singleTool = eeprom::isSingleTool();
 	hasHBP = eeprom::hasHBP();
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	hasCHE = eeprom::hasCHE();
+#endif
+// MOD Trax END
 
 	uint8_t heatSet = eeprom::getEeprom8(eeprom_offsets::PREHEAT_SETTINGS + preheat_eeprom_offsets::PREHEAT_ON_OFF_OFFSET, 0);
 	_rightActive    = (heatSet & (1 << HEAT_MASK_RIGHT)) != 0;
 	_leftActive     = (heatSet & (1 << HEAT_MASK_LEFT)) != 0;
 	_platformActive = (heatSet & (1 << HEAT_MASK_PLATFORM)) != 0;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	_enclosureActive = (heatSet & (1 << HEAT_MASK_ENCLOSURE)) != 0;
+#endif
+// MOD Trax END
 
 	Motherboard &board = Motherboard::getBoard();
 	// It's preheating if any of the heaters are active
@@ -354,8 +383,20 @@ void HeaterPreheatMenu::resetState(){
 	preheatActive =
 		(board.getExtruderBoard(0).getExtruderHeater().get_set_temperature() > 0) ||
 		(board.getExtruderBoard(1).getExtruderHeater().get_set_temperature() > 0) ||
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		(board.getEnclosureHeater().get_set_temperature() > 0) ||
+#endif
+// MOD Trax END
 		(board.getPlatformHeater().get_set_temperature() > 0);
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	itemCount = 5;
+	if ( !hasCHE ) itemCount--;
+#else
+// MOD Trax END
 	itemCount = 4;
+#endif // MOD Trax
 	if ( singleTool ) itemCount--;
 	if ( !hasHBP ) itemCount--;
 }
@@ -383,6 +424,14 @@ void HeaterPreheatMenu::drawItem(uint8_t index, LiquidCrystalSerial& lcd) {
 			msg = PLATFORM_MSG;
 			test = _platformActive;
 		}
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		else if ( hasCHE ) {
+			msg = PLATFORM_MSG;
+			test = _enclosureActive;
+		}
+#endif
+// MOD Trax END
 		else
 			return;
 		break;
@@ -391,16 +440,46 @@ void HeaterPreheatMenu::drawItem(uint8_t index, LiquidCrystalSerial& lcd) {
 			msg = PLATFORM_MSG;
 			test = _platformActive;
 		}
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		else if ( hasCHE ) {
+			msg = ENCLOSURE_MSG;
+			test = _enclosureActive;
+		}
+#endif
+// MOD Trax END
 		else
 			return;
 		break;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	case 4:
+		if ( !singleTool && hasHBP && hasCHE) {
+			msg = ENCLOSURE_MSG;
+			test = _enclosureActive;
+		}
+		break;
+#endif
+// MOD Trax END
 	}
 	lcd.writeFromPgmspace(msg);
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	if(index >= 4)
+		index = 0;
+#endif
+// MOD Trax END
 	lcd.moveWriteFromPgmspace(16, index, test ? ON_MSG : OFF_MSG);
 }
 
 void HeaterPreheatMenu::storeHeatByte() {
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	uint8_t heatByte = (_rightActive*(1<<HEAT_MASK_RIGHT)) | (_leftActive*(1<<HEAT_MASK_LEFT)) | (_platformActive*(1<<HEAT_MASK_PLATFORM)) | (_enclosureActive*(1<<HEAT_MASK_ENCLOSURE));
+#else
+// MOD Trax END
 	uint8_t heatByte = (_rightActive*(1<<HEAT_MASK_RIGHT)) + (_leftActive*(1<<HEAT_MASK_LEFT)) + (_platformActive*(1<<HEAT_MASK_PLATFORM));
+#endif // MOD Trax
 	eeprom_write_byte((uint8_t*)(eeprom_offsets::PREHEAT_SETTINGS + preheat_eeprom_offsets::PREHEAT_ON_OFF_OFFSET), heatByte);
 }
 
@@ -424,11 +503,25 @@ void HeaterPreheatMenu::handleSelect(uint8_t index) {
 				temp = eeprom::getEeprom16(eeprom_offsets::PREHEAT_SETTINGS + preheat_eeprom_offsets::PREHEAT_PLATFORM_TEMP, DEFAULT_PREHEAT_HBP) *_platformActive;
 				Motherboard::getBoard().getPlatformHeater().set_target_temperature(temp);
 			}
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+			if ( hasCHE ) {
+				temp = eeprom::getEeprom16(eeprom_offsets::PREHEAT_ENCLOSURE_TEMP, DEFAULT_PREHEAT_CHE) *_enclosureActive;
+				Motherboard::getBoard().getEnclosureHeater().set_target_temperature(temp);
+			}
+#endif
+// MOD Trax END
 #if !defined(HEATERS_ON_STEROIDS)
 			if ( Motherboard::getBoard().getPlatformHeater().isHeating() )
 				Motherboard::pauseHeaters(true);
 #endif
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+			if ( _platformActive || _rightActive || _leftActive || _enclosureActive ) {
+#else
+// MOD Trax END
 			if ( _platformActive || _rightActive || _leftActive ) {
+#endif // MOD Trax
 				BOARD_STATUS_SET(Motherboard::STATUS_PREHEATING);
 			}
 		}
@@ -448,15 +541,35 @@ void HeaterPreheatMenu::handleSelect(uint8_t index) {
 			_leftActive = !_leftActive;
 		else if ( hasHBP )
 			_platformActive = !_platformActive;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		else if ( hasCHE )
+			_enclosureActive = !_enclosureActive;
+#endif
+// MOD Trax END
 		else
 			return;
 		break;
 	case 3:
 		if ( !singleTool && hasHBP )
 			_platformActive = !_platformActive;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		else if ( hasCHE )
+			_enclosureActive = !_enclosureActive;
+#endif
+// MOD Trax END
 		else
 			return;
 		break;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	case 4:
+		if ( !singleTool && hasHBP && hasCHE)
+			_enclosureActive = !_enclosureActive;
+		break;
+#endif
+// MOD Trax END
 	}
 
 	storeHeatByte();
@@ -1271,12 +1384,22 @@ void MonitorModeScreen::reset() {
 	updatePhase = 0;
 	singleTool = eeprom::isSingleTool();
 	hasHBP = eeprom::hasHBP();
+// MOD Trax BEGIN
+	curScreen = 0;
+	updScreen = 1;
+#ifdef HAS_ENCLOSURE
+	hasCHE = eeprom::hasCHE();
+#endif
+// MOD Trax END
 	toggleBlink = false;
 	heating = false;
 	lastHeatIndex = 0;
 #ifdef BUILD_STATS
+	// MOD Trax REM:
+	/*
 	buildTimePhase = BUILD_TIME_PHASE_FIRST;
 	lastBuildTimePhase = BUILD_TIME_PHASE_FIRST;
+	*/
 	lastElapsedSeconds = 0;
 #endif
 }
@@ -1298,6 +1421,18 @@ void MonitorModeScreen::update(LiquidCrystalSerial& lcd, bool forceRedraw) {
 		}
 	}
 
+// MOD Trax BEGIN
+	if(updScreen){
+		updScreen = 0;
+		forceRedraw = true;
+	}
+	
+#ifdef BUILD_STATS
+		enum host::HostState hostState = host::getHostState();
+		bool isBuilding = (hostState == host::HOST_STATE_BUILDING ) || ( hostState == host::HOST_STATE_BUILDING_FROM_SD );
+#endif
+// MOD Trax END
+
 	if (forceRedraw) {
 
 		lcd.clearHomeCursor();
@@ -1309,6 +1444,8 @@ void MonitorModeScreen::update(LiquidCrystalSerial& lcd, bool forceRedraw) {
 			buildInfo(lcd);
 		}
 
+		if(curScreen == 0) { // MOD Trax
+			
 		uint8_t row;
 		if ( hasHBP ) {
 			lcd.moveWriteFromPgmspace(0, 3, PLATFORM_TEMP_MSG);
@@ -1324,9 +1461,36 @@ void MonitorModeScreen::update(LiquidCrystalSerial& lcd, bool forceRedraw) {
 		}
 		while (row >= 1)
 			lcd.moveWriteFromPgmspace(0, row--, CLEAR_MSG);
+			
+// MOD Trax BEGIN
+		} else if(curScreen == 1) {
+			if (hasCHE){
+				lcd.moveWriteFromPgmspace(0, 1, ENCLOSURE_TEMP_MSG);
+			}
+#ifdef BUILD_STATS
+			if(isBuilding)
+			{
+				lcd.moveWriteFromPgmspace(0, 2, MON_ELAPSED_TIME_MSG);
+				//lcd.moveWriteFromPgmspace(0, 3, );
+			}
+#endif // BUILD_STATS
+			
+		} else if(curScreen == 2) {
+#ifdef BUILD_STATS
+			if(isBuilding)
+			{
+				lcd.moveWriteFromPgmspace(0, 1, MON_FILAMENT_MSG);
+				//lcd.moveWriteFromPgmspace(0, 2, );
+#ifdef ACCEL_STATS
+				lcd.moveWriteFromPgmspace(0, 3, mon_speed);
+#endif // ACCEL_STATS
+			}
+#endif // BUILD_STATS
+		}
+// MOD Trax END
 	}
 
-	OutPacket responsePacket;
+
 	uint16_t data;
 	host::HostState state;
 	int16_t currentDelta = 0;
@@ -1360,7 +1524,14 @@ void MonitorModeScreen::update(LiquidCrystalSerial& lcd, bool forceRedraw) {
 	}
 
 	// Redraw tool info
-	switch (updatePhase) {
+// MOD Trax BEGIN
+	bool writeProgress = false;
+		
+	if(curScreen == 0) {
+
+	switch (updatePhase++) { 
+// MOD Trax END
+	//switch (updatePhase) {
 
 	// Dual extruder Tool 0 current temp
 	case 0:
@@ -1456,7 +1627,14 @@ void MonitorModeScreen::update(LiquidCrystalSerial& lcd, bool forceRedraw) {
 			}
 		}
 		break;
-
+		
+	// MOD Trax BEGIN
+	default:
+		writeProgress = true;
+		updatePhase = 0;
+	// MOD Trax END
+	/*
+	
 	// Build %
 	case 6:
 		state = host::getHostState();
@@ -1545,7 +1723,7 @@ void MonitorModeScreen::update(LiquidCrystalSerial& lcd, bool forceRedraw) {
 #endif // ACCEL_STATS
 		}
 
-        	if ( ! okButtonHeld ) {
+    if ( ! okButtonHeld ) {
 			//Advance buildTimePhase and wrap around
 			lastBuildTimePhase = buildTimePhase;
 			buildTimePhase = (enum BuildTimePhase)((uint8_t)buildTimePhase + 1);
@@ -1555,14 +1733,144 @@ void MonitorModeScreen::update(LiquidCrystalSerial& lcd, bool forceRedraw) {
 		}
 		break;
 #endif // BUILD_STATS
+	*/
 	}
 
+// MOD Trax BEGIN
+	} else if(curScreen == 1) {
+		
+		switch (updatePhase++) {
+		// CHE current temp
+		case 0:
+			if ( hasCHE ) {
+				data = board.getEnclosureHeater().get_current_temperature();
+				if ( board.getEnclosureHeater().has_failed() || data >= BAD_TEMPERATURE )
+					lcd.moveWriteFromPgmspace(12, 1, NA_MSG);
+				else if ( board.getEnclosureHeater().isPaused() )
+					lcd.moveWriteFromPgmspace(12, 1, WAITING_MSG);
+				else
+					lcd.moveWriteInt(12, 1, data, 3);
+			}
+			break;
+	
+		// CHE set temp
+		case 1:
+			if ( hasCHE ) {
+				if ( !board.getEnclosureHeater().has_failed() &&
+				     !board.getEnclosureHeater().isPaused() ) {
+					data = board.getEnclosureHeater().get_set_temperature();
+					if ( data > 0 ) {
+						lcd.moveWriteFromPgmspace(15, 1, ON_CELCIUS_MSG);
+						lcd.moveWriteInt(16, 1, data, 3);
+					}
+					else
+						lcd.moveWriteFromPgmspace(15, 1, CELCIUS_MSG);
+				}
+			}
+			break;
+			
+#ifdef BUILD_STATS
+		case 2:
+			{
+				if(!isBuilding)
+					break;
+				char buf[17];
+				uint32_t secs;
+				lcd.setCursor(13, 2);
+				if ( host::isBuildComplete() )
+				     secs = lastElapsedSeconds; //We stop counting elapsed seconds when we are done
+				else {
+				     lastElapsedSeconds = host::getPrintSeconds();
+				     secs = lastElapsedSeconds;
+				}
+				formatTime(buf, secs);
+				lcd.writeString(buf);
+			}
+			break;
+			
+		case 3:
+			if(!isBuilding)
+					break;
+			writeTimeLeft(lcd, 3);
+			break;
+#endif // BUILD_STATS
+
+		default:
+			writeProgress = true;
+			updatePhase = 0;
+		}
+		
+	} else if(curScreen == 2) {
+		
+		switch (updatePhase++) {
+#ifdef BUILD_STATS
+		case 0:
+			if(!isBuilding)
+					break;
+			lcd.setCursor(9, 1);
+			writeFilamentUsed(lcd, command::filamentUsed());
+			break;
+				
+		case 1:
+			if(!isBuilding)
+					break;
+			writeZPos(lcd, 2);
+			break;
+			
+#ifdef ACCEL_STATS
+		case 2:
+			if(!isBuilding)
+					break;
+			float minSpeed, avgSpeed, maxSpeed;
+			accelStatsGet(&minSpeed, &avgSpeed, &maxSpeed);
+			lcd.moveWriteFromPgmspace(0, 3, mon_speed);
+			lcd.setCursor(4,3);
+			if ( minSpeed < 100.0 )	lcd.write(' ');	//If we have space, pad out a bit
+			lcd.writeFloat(minSpeed, 0, 0);
+			lcd.write('/');
+			lcd.writeFloat(avgSpeed, 0, 0);
+			lcd.write('/');
+			lcd.writeFloat(maxSpeed, 0, 0);
+			lcd.write(' ');
+			break;
+#endif // ACCEL_STATS
+#endif // BUILD_STATS
+
+		default:
+			writeProgress = true;
+			updatePhase = 0;
+		}
+		
+	}
+	
+	if(writeProgress)
+	{
+		state = host::getHostState();
+		if ( !heating && ((state == host::HOST_STATE_BUILDING) || (state == host::HOST_STATE_BUILDING_FROM_SD)) ) {
+
+			uint8_t buildPercentage = command::getBuildPercentage();
+
+			if ( buildPercentage < 100 ) {
+				if ( command::getPauseAtZPos() != 0 ) {
+					lcd.setCursor(16,0);
+					lcd.write('*');
+				}
+				lcd.moveWriteInt(17, 0, buildPercentage, 2);
+			}
+			else if ( buildPercentage == 100 ) {
+				lcd.moveWriteFromPgmspace(16, 0, DONE_MSG);
+			}
+		}
+	}
+// MOD Trax END
+	/*
 #ifdef BUILD_STATS
 	if (++updatePhase > 7)
 #else
 	if (++updatePhase > 6)
 #endif
 		updatePhase = 0;
+	*/
 
 #ifdef DEBUG_ONSCREEN
 	lcd.setRow(0);
@@ -1595,6 +1903,18 @@ void MonitorModeScreen::notifyButtonPressed(ButtonArray::ButtonName button) {
 			interface::popScreen();
 			break;
 		}
+// MOD Trax BEGIN
+	case ButtonArray::UP:
+		if(curScreen > 0)
+			curScreen--;
+		updScreen = 1;
+		break;
+	case ButtonArray::DOWN:
+		if(curScreen < (MON_SCR_COUNT - 1))
+			curScreen++;
+		updScreen = 1;
+		break;
+// MOD Trax END
 	default:
 		break;
 	}
@@ -1758,7 +2078,15 @@ void CounterMenu::notifyButtonPressed(ButtonArray::ButtonName button) {
 }
 
 PreheatSettingsMenu::PreheatSettingsMenu() :
-	CounterMenu(_BV((uint8_t)ButtonArray::UP) | _BV((uint8_t)ButtonArray::DOWN), (uint8_t)4) {
+	CounterMenu(_BV((uint8_t)ButtonArray::UP) | _BV((uint8_t)ButtonArray::DOWN), 
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		(uint8_t)5
+#else
+// MOD Trax END
+		(uint8_t)4
+#endif // MOD Trax 
+		) {
 	reset();
 }
 
@@ -1766,11 +2094,26 @@ void PreheatSettingsMenu::resetState() {
 	counterRight = eeprom::getEeprom16(eeprom_offsets::PREHEAT_SETTINGS + preheat_eeprom_offsets::PREHEAT_RIGHT_TEMP, DEFAULT_PREHEAT_TEMP);
 	counterLeft = eeprom::getEeprom16(eeprom_offsets::PREHEAT_SETTINGS + preheat_eeprom_offsets::PREHEAT_LEFT_TEMP, DEFAULT_PREHEAT_TEMP);
 	counterPlatform = eeprom::getEeprom16(eeprom_offsets::PREHEAT_SETTINGS + preheat_eeprom_offsets::PREHEAT_PLATFORM_TEMP, DEFAULT_PREHEAT_HBP);
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	counterEnclosure = eeprom::getEeprom16(eeprom_offsets::PREHEAT_ENCLOSURE_TEMP, DEFAULT_PREHEAT_CHE);
+#endif
+// MOD Trax END
 	singleTool = eeprom::isSingleTool();
 	hasHBP = eeprom::hasHBP();
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	hasCHE = eeprom::hasCHE();
+#endif
+// MOD Trax END
 	offset = 0;
 	if ( singleTool ) offset++;
 	if ( !hasHBP ) offset++;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	if ( !hasCHE ) offset++;
+#endif
+// MOD Trax END
 	itemIndex = firstItemIndex = 1 + offset;
 }
 
@@ -1815,6 +2158,18 @@ void PreheatSettingsMenu::drawItem(uint8_t index, LiquidCrystalSerial& lcd) {
 			}
 			lcd.moveWriteInt(17, row, counterPlatform, 3);
 		}
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		else if ( hasCHE ) {
+			lcd.writeFromPgmspace(ENCLOSURE_SPACES_MSG);
+			if ( selected ) {
+				lcd.setCursor(16, row);
+				lcd.write(LCD_CUSTOM_CHAR_RIGHT);
+			}
+			lcd.moveWriteInt(17, row, counterEnclosure, 3);
+		}
+#endif
+// MOD Trax END
 		break;
 	case 3:
 		if ( !singleTool && hasHBP ) {
@@ -1825,7 +2180,33 @@ void PreheatSettingsMenu::drawItem(uint8_t index, LiquidCrystalSerial& lcd) {
 			}
 			lcd.moveWriteInt(17, row, counterPlatform, 3);
 		}
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		else if ( hasCHE ) {
+			lcd.writeFromPgmspace(ENCLOSURE_SPACES_MSG);
+			if ( selected ) {
+				lcd.setCursor(16, row);
+				lcd.write(LCD_CUSTOM_CHAR_RIGHT);
+			}
+			lcd.moveWriteInt(17, row, counterEnclosure, 3);
+		}
+#endif
+// MOD Trax END
 		break;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	case 4:
+		if ( !singleTool && hasHBP && hasCHE) {
+			lcd.writeFromPgmspace(ENCLOSURE_SPACES_MSG);
+			if ( selected ) {
+				lcd.setCursor(16, row);
+				lcd.write(LCD_CUSTOM_CHAR_RIGHT);
+			}
+			lcd.moveWriteInt(17, row-4, counterEnclosure, 3);
+		}
+		break;
+#endif
+// MOD Trax END
 	}
 }
 
@@ -1860,6 +2241,16 @@ void PreheatSettingsMenu::handleCounterUpdate(uint8_t index, int8_t up) {
 			if (counterPlatform > MAX_HBP_TEMP )
 				counterPlatform = MAX_HBP_TEMP;
 		}
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		// update enclosure counter
+		else if ( hasCHE ) {
+			counterEnclosure += up;
+			if (counterEnclosure > MAX_CHE_TEMP )
+				counterEnclosure = MAX_CHE_TEMP;
+		}
+#endif
+// MOD Trax END
 		break;
 	case 3:
 		// update platform counter
@@ -1868,7 +2259,29 @@ void PreheatSettingsMenu::handleCounterUpdate(uint8_t index, int8_t up) {
 			if ( counterPlatform > MAX_HBP_TEMP )
 				counterPlatform = MAX_HBP_TEMP;
 		}
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+// update enclosure counter
+		else if ( hasCHE ) {
+			counterEnclosure += up;
+			if (counterEnclosure > MAX_CHE_TEMP )
+				counterEnclosure = MAX_CHE_TEMP;
+		}
+#endif
+// MOD Trax END
 		break;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	case 4:
+		// update enclosure counter
+		if ( !singleTool && hasHBP && hasCHE) {
+			counterEnclosure += up;
+			if (counterEnclosure > MAX_CHE_TEMP )
+				counterEnclosure = MAX_CHE_TEMP;
+		}
+		break;
+#endif
+// MOD Trax END
 	}
 }
 
@@ -1890,12 +2303,32 @@ void PreheatSettingsMenu::handleSelect(uint8_t index) {
 			eeprom_write_word((uint16_t*)(eeprom_offsets::PREHEAT_SETTINGS + preheat_eeprom_offsets::PREHEAT_LEFT_TEMP), counterLeft);
 		else if ( hasHBP )
 			eeprom_write_word((uint16_t*)(eeprom_offsets::PREHEAT_SETTINGS + preheat_eeprom_offsets::PREHEAT_PLATFORM_TEMP), counterPlatform);
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		else if ( hasCHE )
+			eeprom_write_word((uint16_t*)(eeprom_offsets::PREHEAT_ENCLOSURE_TEMP), counterEnclosure);
+#endif
+// MOD Trax END
 		break;
 	case 3:
 		if ( !singleTool && hasHBP )
 			// store platform setting
 			eeprom_write_word((uint16_t*)(eeprom_offsets::PREHEAT_SETTINGS + preheat_eeprom_offsets::PREHEAT_PLATFORM_TEMP), counterPlatform);
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		else if ( hasCHE )
+			eeprom_write_word((uint16_t*)(eeprom_offsets::PREHEAT_ENCLOSURE_TEMP), counterEnclosure);
+#endif
+// MOD Trax END
 		break;
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	case 4:
+		if ( !singleTool && hasHBP && hasCHE )
+			eeprom_write_word((uint16_t*)(eeprom_offsets::PREHEAT_ENCLOSURE_TEMP), counterEnclosure);
+	break;
+#endif
+// MOD Trax END
 	}
 }
 
@@ -2653,6 +3086,117 @@ void MaxZProbeHitsScreen::notifyButtonPressed(ButtonArray::ButtonName button) {
 
 #endif // AUTO_LEVEL
 
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+PStopSettingsMenu::PStopSettingsMenu() :
+	CounterMenu(_BV((uint8_t)ButtonArray::UP) | _BV((uint8_t)ButtonArray::DOWN), (uint8_t)4
+		) {
+	reset();
+}
+
+void PStopSettingsMenu::resetState() {
+	counterEnable = eeprom::getEeprom8(eeprom_offsets::PSTOP_ENABLE, 0);
+	counterTolerance = eeprom::getEeprom8(eeprom_offsets::PSTOP_TOLERANCE, PSTOP_DEFAULT_TOLERANCE);
+	counterCalibration = eeprom::getEepromFixed16(eeprom_offsets::PSTOP_CALIBRATION,1);
+
+	itemIndex = firstItemIndex = 0;
+}
+
+void PStopSettingsMenu::drawItem(uint8_t index, LiquidCrystalSerial& lcd) {
+
+	bool selected = selectIndex == index;
+	uint8_t row = index;
+
+	if ( index ) {
+		if  ( index < firstItemIndex)
+			return;
+	}
+
+	switch (index) {
+	case 0:
+		lcd.writeFromPgmspace(PSTOP_ENABLE_MSG);
+		lcd.setCursor(16, row);
+		lcd.write(selected ? LCD_CUSTOM_CHAR_RIGHT : ' ');
+		lcd.moveWriteFromPgmspace(17, row, counterEnable ? ON_MSG : OFF_MSG);
+		break;
+	case 1:
+		lcd.writeFromPgmspace(PSTOP_MONITOR_TOLERANCE);
+		lcd.setCursor(15, row);
+		lcd.write(selected ? LCD_CUSTOM_CHAR_RIGHT : ' ');
+		lcd.moveWriteInt(16, row, counterTolerance, 3);
+		lcd.write('%');
+		break;
+	case 2:
+		lcd.writeFromPgmspace(PSTOP_MONITOR_CALIBRATION);
+		lcd.setCursor(15, row);
+		lcd.write(selected ? LCD_CUSTOM_CHAR_RIGHT : ' ');
+		lcd.writeFloat(counterCalibration, 1, LCD_SCREEN_WIDTH);
+		break;
+	case 3:
+		if((host::getHostState() == host::HOST_STATE_BUILDING || host::getHostState() == host::HOST_STATE_BUILDING_FROM_SD)) {
+			lcd.writeFromPgmspace(PSTOP_MONITOR_STATUS);
+			lcd.writeFloat(Motherboard::getBoard().pstop_test_R, 2, 0);
+			lcd.write('/');
+			lcd.writeFloat(Motherboard::getBoard().pstop_test_L, 2, 0);
+		}
+		break;
+	}
+}
+
+void PStopSettingsMenu::handleCounterUpdate(uint8_t index, int8_t up) {
+
+	if ( index < firstItemIndex )
+		return;
+
+	uint16_t repetitions = Motherboard::getBoard().getInterfaceBoard().getButtonRepetitions();
+	if ( repetitions > 6 ) up *= 5;
+	else if ( repetitions > 18 ) up *= 10;
+
+	switch (index) {
+	case 0:
+		counterEnable = !counterEnable;
+		break;
+	case 1:
+		counterTolerance += up;
+		if ( counterTolerance > 100 )
+			counterTolerance = 100;
+		else if ( counterTolerance < 0 )
+			counterTolerance = 0;
+		break;
+	case 2:
+		counterCalibration += float(up)/10;
+		break;
+	case 3:
+		
+		break;
+	}
+}
+
+void PStopSettingsMenu::handleSelect(uint8_t index) {
+	if  ( index < firstItemIndex )
+		return;
+
+	switch (index) {
+	case 0:
+		Motherboard::getBoard().pstop_enabled = counterEnable;
+		eeprom_write_byte((uint8_t*)eeprom_offsets::PSTOP_ENABLE, counterEnable);
+		break;
+	case 1:
+		Motherboard::getBoard().pstop_tolerance = (100.0 - counterTolerance)/100.0;
+		eeprom_write_byte((uint8_t*)eeprom_offsets::PSTOP_TOLERANCE, counterTolerance);
+		break;
+	case 2:
+		Motherboard::getBoard().pstop_enc_calibr = counterCalibration;
+		eeprom::setEepromFixed16(eeprom_offsets::PSTOP_CALIBRATION, counterCalibration);
+		break;
+	case 3:
+		
+		break;
+	}
+}
+#endif
+// MOD Trax END
+
 void ChangeSpeedScreen::reset() {
 	speedFactor = steppers::speedFactor;
 	alterSpeed = steppers::alterSpeed;
@@ -2705,13 +3249,17 @@ void ChangeSpeedScreen::notifyButtonPressed(ButtonArray::ButtonName button) {
 
 void ChangeTempScreen::reset() {
 	// Make getTemp() thing that a toolhead change has occurred
-	activeToolhead = 255;
+	//activeToolhead = 255;
+	// MOD Trax BEGIN
+	activeToolhead = 0;
+	updateToolhead = 1;
+	// MOD Trax END
 	altTemp = 0;
 	getTemp();
 }
 
 void ChangeTempScreen::getTemp() {
-	uint8_t at;
+	/*uint8_t at;
 	steppers::getStepperPosition(&at);
 	if ( at != activeToolhead ) {
 		activeToolhead = at;
@@ -2722,7 +3270,36 @@ void ChangeTempScreen::getTemp() {
 		    if ( altTemp == 0 )
 			altTemp = command::pausedExtruderTemp[activeToolhead];
 		}
+	}*/
+	// MOD Trax BEGIN
+	if(updateToolhead) {
+		updateToolhead = 0;
+		
+		if(activeToolhead == 2) 
+			altTemp = command::altTemp_platform;
+#ifdef HAS_ENCLOSURE
+		else if(activeToolhead == 3)
+			altTemp = command::altTemp_enclosure;
+#endif
+		else
+			altTemp = command::altTemp[activeToolhead];
+				
+		if ( altTemp == 0 ) {
+		  // Get the current set point
+			if(activeToolhead == 2) 
+				altTemp = (uint16_t)Motherboard::getBoard().getPlatformHeater().get_set_temperature();
+#ifdef HAS_ENCLOSURE
+			else if(activeToolhead == 3)
+				altTemp = (uint16_t)Motherboard::getBoard().getEnclosureHeater().get_set_temperature();
+#endif
+			else {
+		  	altTemp = (uint16_t)Motherboard::getBoard().getExtruderBoard(activeToolhead).getExtruderHeater().get_set_temperature();
+				if ( altTemp == 0 )
+					altTemp = command::pausedExtruderTemp[activeToolhead];
+			}
+		}
 	}
+	// MOD Trax END
 }
 
 void ChangeTempScreen::update(LiquidCrystalSerial& lcd, bool forceRedraw) {
@@ -2737,33 +3314,112 @@ void ChangeTempScreen::update(LiquidCrystalSerial& lcd, bool forceRedraw) {
 	getTemp();
 
 	// Redraw tool info
-	lcd.moveWriteInt(0, 1, altTemp, 3);
-	lcd.write('C');
+// MOD Trax BEGIN
+	switch(activeToolhead)
+	{
+		case 0: lcd.moveWriteFromPgmspace(0, 1, EXTRUDER1_TEMP_MSG); break;
+		case 1: lcd.moveWriteFromPgmspace(0, 1, EXTRUDER2_TEMP_MSG); break;
+		case 2: lcd.moveWriteFromPgmspace(0, 1, PLATFORM_TEMP_MSG); break;
+#ifdef HAS_ENCLOSURE
+		case 3: lcd.moveWriteFromPgmspace(0, 1, ENCLOSURE_TEMP_MSG); break;
+#endif
+	}
+	lcd.moveWriteInt(12, 1, altTemp, 3);
+	lcd.write('/');
+	uint16_t curTemp = 0;
+	if(activeToolhead == 2) 
+		curTemp = (uint16_t)Motherboard::getBoard().getPlatformHeater().get_current_temperature();
+#ifdef HAS_ENCLOSURE
+	else if(activeToolhead == 3)
+		curTemp = (uint16_t)Motherboard::getBoard().getEnclosureHeater().get_current_temperature();
+#endif
+	else
+		curTemp = (uint16_t)Motherboard::getBoard().getExtruderBoard(activeToolhead).getExtruderHeater().get_current_temperature();
+	lcd.writeInt(curTemp, 3); 
+// MOD Trax END
+	//lcd.moveWriteInt(0, 1, altTemp, 3);
+	//lcd.write('C');
 }
 
 void ChangeTempScreen::notifyButtonPressed(ButtonArray::ButtonName button) {
 	int16_t temp = (int16_t)(0x7fff & altTemp);
+
+// MOD Trax END
+	uint16_t step = 1;
+	uint16_t repetitions = Motherboard::getBoard().getInterfaceBoard().getButtonRepetitions();
+	if ( repetitions > 6 ) step *= 5;
+	else if ( repetitions > 18 ) step *= 10;
+// MOD Trax BEGIN
+
 	switch (button) {
 	case ButtonArray::CENTER:
 	{
 		// Set the temperature
-		command::altTemp[activeToolhead] = altTemp;
+		// MOD Trax BEGIN
+		Motherboard &board = Motherboard::getBoard();
+		if(activeToolhead == 2) {
+			command::altTemp_platform = altTemp;
+			if ( board.getPlatformHeater().get_set_temperature() != 0 )
+				board.getPlatformHeater().set_target_temperature(altTemp);
+		}
+#ifdef HAS_ENCLOSURE
+		else if(activeToolhead == 3) {
+			command::altTemp_enclosure = altTemp;
+			if ( board.getEnclosureHeater().get_set_temperature() != 0 )
+				board.getEnclosureHeater().set_target_temperature(altTemp);
+		}
+#endif
+		else {
+			command::altTemp[activeToolhead] = altTemp;
+			if ( board.getExtruderBoard(activeToolhead).getExtruderHeater().get_set_temperature() != 0 )
+				board.getExtruderBoard(activeToolhead).getExtruderHeater().set_target_temperature(altTemp);
+		}
+		return; 
+		// MOD Trax END
+		/*command::altTemp[activeToolhead] = altTemp;
 		Motherboard &board = Motherboard::getBoard();
 		if ( board.getExtruderBoard(activeToolhead).getExtruderHeater().get_set_temperature() != 0 )
 			board.getExtruderBoard(activeToolhead).getExtruderHeater().set_target_temperature(altTemp);
-#ifdef DITTO_PRINT
+		#ifdef DITTO_PRINT
 		if ( command::dittoPrinting ) {
-		    uint8_t otherToolhead = activeToolhead ? 0 : 1;
-		    command::altTemp[otherToolhead] = altTemp;
-		    if ( board.getExtruderBoard(otherToolhead).getExtruderHeater().get_set_temperature() != 0 )
+	    	uint8_t otherToolhead = activeToolhead ? 0 : 1;
+	    	command::altTemp[otherToolhead] = altTemp;
+	    	if ( board.getExtruderBoard(otherToolhead).getExtruderHeater().get_set_temperature() != 0 )
 			board.getExtruderBoard(otherToolhead).getExtruderHeater().set_target_temperature(altTemp);
 		}
-#endif
+		#endif */
 	}
 	// FALL THROUGH
+	//case ButtonArray::LEFT:
+	//	interface::popScreen();
+	//	return;
+	// MOD Trax BEGIN
 	case ButtonArray::LEFT:
-		interface::popScreen();
+		if(activeToolhead <= 0)
+			interface::popScreen();
+		else
+			activeToolhead --;
+		updateToolhead = 1;
 		return;
+	case ButtonArray::RIGHT:
+#ifdef HAS_ENCLOSURE
+		if(activeToolhead < 3)
+#else
+		if(activeToolhead < 2)
+#endif
+			activeToolhead ++;
+		updateToolhead = 1;
+		return;
+	case ButtonArray::UP:
+		// increment
+		temp += step;
+		break;
+	case ButtonArray::DOWN:
+		// decrement
+		temp -= step;
+		break;
+	// MOD Trax END
+	/*
 	case ButtonArray::UP:
 		// increment
 		temp += 1;
@@ -2772,6 +3428,7 @@ void ChangeTempScreen::notifyButtonPressed(ButtonArray::ButtonName button) {
 		// decrement
 		temp -= 1;
 		break;
+		*/
 	default:
 		return;
 	}
@@ -2846,9 +3503,27 @@ void ActiveBuildMenu::resetState() {
 	// state to ascertain if the fan is logically on.
 	fanState = EX_FAN.getValue();
 #endif
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	cheState = Motherboard::getBoard().getEnclosureHeater().get_set_temperature() != 0;
+#endif
+	toolSwap = command::swappedToolheads;
+// MOD Trax END
 	is_paused = command::isPaused();
 
 	itemCount = is_paused ? 7 : 9;  // paused: 6 + load/unload; !paused: 6 + fan off + pause @ zpos + cold
+		
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	itemCount++;
+#endif
+#ifdef PSTOP_MONITOR
+	itemCount++;
+#endif
+
+	if ( is_paused )
+		itemCount++;
+// MOD Trax END
 
 	//If any of the heaters are on, we provide another
 	//  menu options, "Heaters Off"
@@ -2918,6 +3593,23 @@ void ActiveBuildMenu::drawItem(uint8_t index, LiquidCrystalSerial& lcd) {
 		if ( index == lind ) msg = fanState ? FAN_OFF_MSG : FAN_ON_MSG;
 		lind++;
 	}
+	
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	if ( index == lind ) msg = cheState ? CHE_OFF_MSG : CHE_ON_MSG;
+	lind++;
+#endif
+
+#ifdef PSTOP_MONITOR
+	if ( index == lind ) msg = PSTOP_MONITOR_MSG;
+	lind++;
+#endif
+
+	if ( is_paused ) {
+		if ( index == lind ) msg = toolSwap ? UNSWAP_TOOLS_MSG : SWAP_TOOLS_MSG;
+		lind++;
+	}
+// MOD Trax END
 
 	if ( index == lind ) msg = STATS_MSG;
 	lind++;
@@ -3025,6 +3717,36 @@ void ActiveBuildMenu::handleSelect(uint8_t index) {
 		}
 		lind++;
 	}
+	
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	if ( index == lind ) {
+		cheState = !cheState;
+		uint16_t temp = command::altTemp_enclosure ? command::altTemp_enclosure : eeprom::getEeprom16(eeprom_offsets::PREHEAT_ENCLOSURE_TEMP, 50);
+		Motherboard::getBoard().getEnclosureHeater().set_target_temperature(cheState ? temp : 0);
+		lineUpdate = true;
+		return;
+	}
+	lind++;
+#endif
+
+#ifdef PSTOP_MONITOR
+	if ( index == lind ) {
+	     interface::pushScreen(&pStopSettingsMenu);
+	}
+	lind++;
+#endif
+
+	if ( is_paused ) {
+		if ( index == lind ) {
+			toolSwap = !toolSwap;
+			command::swapToolheads(toolSwap);
+			lineUpdate = true;
+			return;
+		}
+		lind++;
+	}
+// MOD Trax END
 
 	if ( index == lind ) {
 		interface::pushScreen(&buildStatsScreen);
@@ -3263,6 +3985,11 @@ UtilitiesMenu::UtilitiesMenu() :
 	     + 1
 #endif
 #endif
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+			+ 1
+#endif
+// MOD Trax END
 #if defined(COOLING_FAN_PWM)
 	    + 1
 #endif
@@ -3289,6 +4016,11 @@ void UtilitiesMenu::resetState() {
 	     1 +
 #endif
 #endif
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+			1 +
+#endif
+// MOD Trax END
 	     16;
 #if !defined(SINGLE_EXTRUDER)
 	singleTool = eeprom::isSingleTool();
@@ -3360,6 +4092,13 @@ void UtilitiesMenu::drawItem(uint8_t index, LiquidCrystalSerial& lcd) {
 #endif
 
 #endif
+
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+	if ( index == lind ) msg = PSTOP_MONITOR_MSG;
+	lind++;
+#endif
+// MOD Trax END
 
 #if !defined(SINGLE_EXTRUDER)
 	if ( !singleTool ) {
@@ -3495,6 +4234,15 @@ void UtilitiesMenu::handleSelect(uint8_t index) {
 
 #endif
 
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+	if ( index == lind ) {
+	     interface::pushScreen(&pStopSettingsMenu);
+	}
+	lind++;
+#endif
+// MOD Trax END
+
 #if !defined(SINGLE_EXTRUDER)
 	if ( !singleTool ) {
 	     if ( index == lind ) {
@@ -3586,6 +4334,11 @@ SettingsMenu::SettingsMenu() :
 #ifdef MACHINE_ID_MENU
 		    +1
 #endif
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+				+1
+#endif
+// MOD Trax END
 		) {
 	reset();
 }
@@ -3611,6 +4364,11 @@ uint16_t type2MachineId(uint8_t bt) {
 
 void SettingsMenu::resetState(){
 	hasHBP = eeprom::hasHBP();
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	hasCHE = eeprom::hasCHE();
+#endif
+// MOD Trax END
 	singleExtruder = 2 != eeprom::getEeprom8(eeprom_offsets::TOOL_COUNT, 1);
 	soundOn = 0 != eeprom::getEeprom8(eeprom_offsets::BUZZ_SETTINGS, 1);
 	accelerationOn = 0 != eeprom::getEeprom8(eeprom_offsets::ACCELERATION_SETTINGS + acceleration_eeprom_offsets::ACCELERATION_ACTIVE, 0x01);
@@ -3703,6 +4461,18 @@ void SettingsMenu::drawItem(uint8_t index, LiquidCrystalSerial& lcd) {
 	     goto done;
 	}
 	lind++;
+	
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	if ( index == lind ) {
+	     selection_column = (LCD_SCREEN_WIDTH - 1) - YES_NO_WIDTH;
+	     lcd.moveWriteFromPgmspace(1, row, CHE_MSG);
+	     lcd.moveWriteFromPgmspace(selection_column + 1, row, hasCHE ? YES_MSG : NO_MSG);
+	     goto done;
+	}
+	lind++;
+#endif
+// MOD Trax END
 
 	if ( index == lind ) {
 	     msg = SD_USE_CRC_MSG;
@@ -3793,6 +4563,15 @@ void SettingsMenu::handleCounterUpdate(uint8_t index, int8_t up) {
 	     hasHBP = !hasHBP;
 	}
 	lind++;
+	
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	if ( index == lind ) {
+	     hasCHE = !hasCHE;
+	}
+	lind++;
+#endif
+// MOD Trax END
 
 	if ( index == lind ) {
 	     useCRC = !useCRC;
@@ -3892,6 +4671,18 @@ void SettingsMenu::handleSelect(uint8_t index) {
 	     flags = SETTINGS_COMMANDRST | SETTINGS_LINEUPDATE;
 	}
 	lind++;
+
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	if ( index == lind ) {
+	     eeprom_write_byte((uint8_t*)eeprom_offsets::CHE_PRESENT, hasCHE ? 1 : 0);
+	     if ( !hasCHE )
+		  Motherboard::getBoard().getEnclosureHeater().set_target_temperature(0);
+	     flags = SETTINGS_COMMANDRST | SETTINGS_LINEUPDATE;
+	}
+	lind++;
+#endif
+// MOD Trax END
 
 	if ( index == lind ) {
 	     eeprom_write_byte((uint8_t*)eeprom_offsets::SD_USE_CRC,

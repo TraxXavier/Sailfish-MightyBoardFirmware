@@ -127,6 +127,14 @@ Motherboard::Motherboard() :
 			//       the calibration_offset for Tool 0 to be used instead
             		eeprom_offsets::T0_DATA_BASE + toolhead_eeprom_offsets::HBP_PID_BASE, false, 2),
 	using_platform(eeprom::getEeprom8(eeprom_offsets::HBP_PRESENT, 1)),
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	enclosure_thermistor(ENCLOSURE_PIN, TemperatureTable::table_thermistor), // X-TODO
+	enclosure_heater(enclosure_thermistor,enclosure_element,SAMPLE_INTERVAL_MICROS_THERMISTOR,
+            		eeprom_offsets::T1_DATA_BASE + toolhead_eeprom_offsets::HBP_PID_BASE, false, 3),
+	using_enclosure(eeprom::getEeprom8(eeprom_offsets::CHE_PRESENT, 1)),
+#endif
+// MOD Trax END
 #ifdef MODEL_REPLICATOR2
 	Extruder_One(0, EXA_PWR, EXA_FAN, ThermocoupleReader::CHANNEL_ONE, eeprom_offsets::T0_DATA_BASE),
 	Extruder_Two(1, EXB_PWR, EXB_FAN, ThermocoupleReader::CHANNEL_TWO, eeprom_offsets::T1_DATA_BASE)
@@ -137,6 +145,23 @@ Motherboard::Motherboard() :
 #ifdef PSTOP_SUPPORT
 	, pstop_enabled(0)
 #endif
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+	, pstop_enc_calibr(eeprom::getEepromFixed16(eeprom_offsets::PSTOP_CALIBRATION,1)) //7.3;
+	, pstop_tolerance((100.0 - eeprom::getEeprom8(eeprom_offsets::PSTOP_TOLERANCE, PSTOP_DEFAULT_TOLERANCE))/100.0)
+	
+	, last_seconds(0)
+	
+	, acc_counter(0)
+	, list_pos(0)
+	, wait_counter(0)
+	
+	, was_building(false)
+	
+	, pstop_test_R(0.0)
+	, pstop_test_L(0.0)
+#endif
+// MOD Trax END
 {
 }
 
@@ -251,7 +276,8 @@ void Motherboard::initClocks(){
 
 #if defined(PSTOP_SUPPORT)
 	pstop_enabled = eeprom::getEeprom8(eeprom_offsets::PSTOP_ENABLE, 0);
-#if defined(PSTOP_VECT)
+#if defined(PSTOP_VECT) && !defined(PSTOP_MONITOR) // MOD Trax
+// #if defined(PSTOP_VECT)
 	// We set a LOW pin change interrupt on the X min endstop
 	if ( pstop_enabled == 1 ) {
 		PSTOP_MSK |= ( 1 << PSTOP_PCINT );
@@ -366,6 +392,15 @@ void Motherboard::reset(bool hard_reset) {
 	platform_heater.reset();
 	platform_timeout.start(SAMPLE_INTERVAL_MICROS_THERMISTOR);
 
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	CHE_HEAT.setDirection(true);
+	enclosure_thermistor.init();
+	enclosure_heater.reset();
+	enclosure_timeout.start(SAMPLE_INTERVAL_MICROS_THERMISTOR);
+#endif
+// MOD Trax END
+
 	// Note it's less code to turn them all off at once
 	//  then to conditionally turn of or disable
 	heatersOff(true);
@@ -377,6 +412,13 @@ void Motherboard::reset(bool hard_reset) {
 	// disable platform heater if no HBP
 	if ( !eeprom::hasHBP() )
 	    platform_heater.disable(true);
+
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	if ( !eeprom::hasCHE() )
+	    enclosure_heater.disable(true);
+#endif
+// MOD Trax END
 
 	// user_input_timeout.start(USER_INPUT_TIMEOUT);
 #ifdef HAS_RGB_LED
@@ -453,7 +495,7 @@ void Motherboard::HeatingAlerts() {
 	Heater& heater1 = getExtruderBoard(1).getExtruderHeater();
 
 	if ( heater0.isHeating() || heater1.isHeating() ||
-	     getPlatformHeater().isHeating() ) {
+	     getPlatformHeater().isHeating() ) { // X-TODO ?
 		
 		if ( getPlatformHeater().isHeating() ) {
 			deltaTemp = getPlatformHeater().getDelta()*2;
@@ -602,6 +644,17 @@ void Motherboard::runMotherboardSlice() {
 		platform_heater.manage_temperature();
 		platform_timeout.start(SAMPLE_INTERVAL_MICROS_THERMISTOR);
 	}
+	
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	if ( isUsingEnclosure() && enclosure_timeout.hasElapsed() ) {
+		// manage heating loops for the CHE
+		enclosure_heater.manage_temperature();
+		enclosure_timeout.start(SAMPLE_INTERVAL_MICROS_THERMISTOR);
+	}
+#endif
+// MOD Trax END
+
 
 	// if waiting on button press
 	if ( buttonWait ) {
@@ -640,6 +693,11 @@ void Motherboard::runMotherboardSlice() {
 		// alert user if heaters are not already set to 0
 		if ( (Extruder_One.getExtruderHeater().get_set_temperature() > 0) ||
 		     (Extruder_Two.getExtruderHeater().get_set_temperature() > 0) ||
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+					(enclosure_heater.get_set_temperature() > 0) ||
+#endif
+// MOD Trax END
 		     (platform_heater.get_set_temperature() > 0) ) {
 			interfaceBoard.errorMessage(HEATER_INACTIVITY_MSG, false);
 			startButtonWait();
@@ -668,6 +726,11 @@ void Motherboard::runMotherboardSlice() {
 			else if ( heatShutdown == 1 ) msg = HEATER_TOOL0_MSG;
 			else msg = HEATER_TOOL1_MSG;
 		}
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+		else if ( heatShutdown == 4 ) msg = HEATER_ENCLOSURE_MSG;
+#endif
+// MOD Trax END
 		else msg = HEATER_PLATFORM_MSG;
 
 		/// error message
@@ -689,6 +752,12 @@ void Motherboard::runMotherboardSlice() {
 				Extruder_One.getExtruderHeater().set_target_temperature(0);
 			if ( Extruder_Two.getExtruderHeater().has_failed() )
 				Extruder_Two.getExtruderHeater().set_target_temperature(0);
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+			if ( enclosure_heater.has_failed() )
+				enclosure_heater.set_target_temperature(0);
+#endif
+// MOD Trax END
 			if ( platform_heater.has_failed() )
 				platform_heater.set_target_temperature(0);
 #endif
@@ -751,6 +820,113 @@ void Motherboard::runMotherboardSlice() {
 		extruder_update = false;
 	}
 #endif
+
+// MOD Trax BEGIN
+#ifdef PSTOP_MONITOR
+		micros_t seconds = getCurrentSeconds();
+		if(seconds - last_seconds >= ACC_INTER) { // check filament progress every 3 seconds
+			last_seconds = seconds;
+
+
+/*#ifdef UART_DEBUG
+	UART::getHostUART().printInt(board_status,1);
+	UART::getHostUART().printString(" ");
+	UART::getHostUART().printFloat(Motherboard::getBoard().getEnclosureHeater().get_current_temperature(),1);
+	UART::getHostUART().printString(" ");
+	UART::getHostUART().printFloat(Motherboard::getBoard().getEnclosureHeater().get_set_temperature(),1);
+	UART::getHostUART().printString("\r\n");
+#endif*/
+		
+			bool is_building = //(host::getHostState() == host::HOST_STATE_BUILDING 
+												 //		|| host::getHostState() == host::HOST_STATE_BUILDING_FROM_SD) &&
+													 host::getBuildState() == host::BUILD_RUNNING;
+		
+			if(!is_building)
+				was_building = false;
+			else if(!was_building){
+				was_building = true;
+			
+				for(int i=0; i < LIST_LENGTH; i++) {
+					list_enc_R[i] = list_step_R[i] = list_enc_L[i] = list_step_L[i] = 0;
+				}
+				
+				acc_counter = 0;
+				list_pos = 0;
+				
+				wait_counter = 5; // 2*5 = 10 seconds wait period
+			}
+			else {
+				int16_t cur_enc_R = 0;
+				TWI_write_byte(PSTOP_MONITOR, 0x01); //READ_R
+				_delay_us(10);
+				TWI_read_byte(PSTOP_MONITOR, (uint8_t*)&cur_enc_R, 2);
+				
+				volatile extern int16_t steps_R;
+				int16_t cur_step_R = steps_R;
+				steps_R = 0;
+				
+				int16_t cur_enc_L = 0;
+				TWI_write_byte(PSTOP_MONITOR, 0x02); //READ_L
+				_delay_us(10);
+				TWI_read_byte(PSTOP_MONITOR, (uint8_t*)&cur_enc_L, 2);
+				
+				volatile extern int16_t steps_L;
+				int16_t cur_step_L = steps_L;
+				steps_L = 0;
+				
+				list_enc_R[list_pos] += cur_enc_R;
+				list_step_R[list_pos] += cur_step_R;
+				
+				list_enc_L[list_pos] += cur_enc_L;
+				list_step_L[list_pos] += cur_step_L;
+				
+				if(++acc_counter >= LIST_ACC) {
+					acc_counter = 0;
+					
+					if(++list_pos >= LIST_LENGTH)
+						list_pos = 0;
+					
+					list_enc_R[list_pos] = 0;
+					list_step_R[list_pos] = 0;
+					
+					list_enc_L[list_pos] = 0;
+					list_step_L[list_pos] = 0;
+				}
+				
+				float enc_R = 0;
+				float step_R = 0;
+				float enc_L = 0;
+				float step_L = 0;
+				
+				for(int i=0; i < LIST_LENGTH; i++) {
+					enc_R += list_enc_R[i];
+					step_R += list_step_R[i];
+					enc_L += list_enc_L[i];
+					step_L += list_step_L[i];
+				}
+				enc_R *= pstop_enc_calibr;
+				enc_L *= pstop_enc_calibr;
+				
+				// delta in percent 1 all is good, fail < 0.80
+				pstop_test_R = step_R ? (enc_R / step_R) : 0.0;
+				pstop_test_L = step_L ? (enc_L / step_L) : 0.0;
+				
+				if(step_R > 0 || step_L > 0) { // wait for the print to to start
+					if(wait_counter > 0)
+						wait_counter--;
+					else{	
+	#if defined(PSTOP_SUPPORT)
+						if ( (Motherboard::getBoard().pstop_enabled == 1) 
+								&& ( (cur_step_R > 0 && pstop_test_R < pstop_tolerance) || (cur_step_L > 0 && pstop_test_L < pstop_tolerance) ) )
+							command::pstop_triggered = true;
+	#endif
+					}
+				}
+			}
+		}
+#endif
+// MOD Trax END
+
 }
 
 // reset user timeout to start from zero
@@ -763,7 +939,8 @@ ISR(STEPPER_TIMERn_COMPA_vect) {
 	Motherboard::getBoard().doStepperInterrupt();
 }
 
-#if defined(PSTOP_SUPPORT) && defined(PSTOP_VECT)
+#if defined(PSTOP_SUPPORT) && defined(PSTOP_VECT) && !defined(PSTOP_MONITOR) // MOD Trax
+//#if defined(PSTOP_SUPPORT) && defined(PSTOP_VECT)
 
 ISR(PSTOP_VECT) {
 	if ( (Motherboard::getBoard().pstop_enabled == 1) && (PSTOP_PORT.getValue() == 0) ) command::pstop_triggered = true;
@@ -862,11 +1039,11 @@ ISR(TIMER5_COMPA_vect) {
 #endif
 
      // Motherboard::getBoard().UpdateMicros();
-     if ( ++centa_micros == 0 ) ++clock_wrap;
-     if ( ++mcount >= 10000 ) {
+  if ( ++centa_micros == 0 ) ++clock_wrap;
+  if ( ++mcount >= 10000 ) {
 	  seconds += 1;
 	  mcount = 0;
-     }
+  }
 
 #if defined(FF_CREATOR_X) && defined(__AVR_ATmega2560__)  ///add by FF_OU, impletement a softPWM to lower the HBP output
      //softpwm
@@ -902,7 +1079,7 @@ ISR(TIMER5_COMPA_vect) {
 #endif
 
 #if defined(PSTOP_SUPPORT)
-#if !defined(PSTOP_VECT)
+#if !defined(PSTOP_VECT) && !defined(PSTOP_MONITOR) // MOD Trax
 	if ( (Motherboard::getBoard().pstop_enabled == 1) && (PSTOP_PORT.getValue() == 0) ) command::pstop_triggered = true;
 #endif
 #if defined(PSTOP_ZMIN_LEVEL) && defined(Z_MIN_STOP_PORT) && defined(AUTO_LEVEL)
@@ -964,6 +1141,14 @@ ISR(TIMER5_COMPA_vect) {
 void Motherboard::setUsingPlatform(bool is_using) {
   using_platform = is_using;
 }
+
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+void Motherboard::setUsingEnclosure(bool is_using) {
+  using_enclosure = is_using;
+}
+#endif
+// MOD Trax END
 
 #if defined(COOLING_FAN_PWM)
 
@@ -1031,6 +1216,51 @@ void BuildPlatformHeatingElement::setHeatingElement(uint8_t value) {
 
 }
 
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+#define HEATER_HOLD_OFF 15
+
+void BuildEnclosureHeatingElement::setHeatingElement(uint8_t value) {
+
+	//UART::getHostUART().printFloat(Motherboard::getBoard().getEnclosureHeater().get_current_temperature(),1);
+	//UART::getHostUART().printString(" ");
+		
+	//UART::getHostUART().printFloat(value,1);
+	//UART::getHostUART().printString(" ");
+		
+	static uint8_t oldValue = 0;
+		
+	static uint16_t lowpassAverage = 0;
+	lowpassAverage = (9*lowpassAverage + value)/10;
+	if((oldValue == 0 && lowpassAverage < 8) || value == 0) // must be more than 12% also 0 takes always precedence
+		lowpassAverage = 0;
+	
+	value = lowpassAverage;
+
+	//UART::getHostUART().printFloat(value,1);
+
+	static micros_t lastOff = 0;
+	uint8_t newValue = value;
+	if(oldValue != 0 && value == 0){
+		lastOff = Motherboard::getBoard().getCurrentSeconds();
+	}
+	else if(value != 0){
+		if(Motherboard::getBoard().getCurrentSeconds() - lastOff < HEATER_HOLD_OFF) {
+			//UART::getHostUART().printString("hold off");
+			value = 0;
+		}
+	}
+	oldValue = newValue; // bypas holdoff
+	
+	//UART::getHostUART().printString("\r\n");
+
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+  	CHE_HEAT.setValue(value != 0);
+	}
+}
+#endif
+// MOD Trax END
+
 void Motherboard::heatersOff(bool platform)
 {
 	motherboard.getExtruderBoard(0).getExtruderHeater().Pause(false);
@@ -1038,6 +1268,11 @@ void Motherboard::heatersOff(bool platform)
 	motherboard.getExtruderBoard(1).getExtruderHeater().Pause(false);
 	motherboard.getExtruderBoard(1).getExtruderHeater().set_target_temperature(0);
 	if ( platform ) motherboard.getPlatformHeater().set_target_temperature(0);
+// MOD Trax BEGIN
+#ifdef HAS_ENCLOSURE
+	if ( platform ) motherboard.getEnclosureHeater().set_target_temperature(0);
+#endif
+// MOD Trax END
 	BOARD_STATUS_CLEAR(Motherboard::STATUS_PREHEATING);
 }
 

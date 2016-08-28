@@ -32,6 +32,12 @@
 #include "UtilityScripts.hh"
 #include "Piezo.hh"
 
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+#include "../shared/Menu_locales.hh"
+#endif
+// MOD Trax END
+
 #if defined(STACK_PAINT) && defined(DEBUG_SRAM_MONITOR)
 	bool stackAlertLockout = false;
 	uint16_t stackAlertCounter = 0;
@@ -149,6 +155,13 @@ int main() {
 	board.init();
 	reset(true);
 	sei();
+	
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+	UART::getHostUART().printPStr(DBG_READY_MSG);
+#endif
+// MOD Trax END
+
 	while (1) {
 		// Host interaction thread.
 		host::runHostSlice();
@@ -156,8 +169,9 @@ int main() {
 		command::runCommandSlice();
 		// Motherboard slice
 		board.runMotherboardSlice();
-                // Stepper slice
-                steppers::runSteppersSlice();
+		// Stepper slice
+		steppers::runSteppersSlice();
+
 
 		//Alert if SRAM/stack has been corrupted by running out of SRAM
 #if defined(STACK_PAINT) && defined(DEBUG_SRAM_MONITOR)

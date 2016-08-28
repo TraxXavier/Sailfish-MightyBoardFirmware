@@ -82,6 +82,12 @@ private:
   /// \param[in] data Data byte to send
   inline void send_byte(char data);
 
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+	inline void print_byte(char data);
+#endif
+// MOD Trax END
+
 #ifdef ALTERNATE_UART
   // writable UART for the case where UART index can be toggled.
   uint8_t index_;           ///< Hardware UART index
@@ -98,6 +104,23 @@ public:
 
   /// Begin sending the data located in the #out packet.
   void beginSend();
+
+// MOD Trax BEGIN
+#ifdef UART_DEBUG
+  InStream dbg_in;
+  OutStream dbg_out;
+
+  void printPStr(const prog_uchar pstr[]);
+  
+  void printString(const char* str);
+  
+  void printInt(uint16_t value, uint8_t digits);
+  void printInt32(uint32_t value, uint8_t digits);
+  void printFloat(float value, uint8_t decimalPlaces);
+
+	void beginPrint();
+#endif
+// MOD Trax END
 
   /// Enable or disable the serial port.
   /// \param[in] true to enable the serial port, false to disable it.
