@@ -930,7 +930,7 @@ bool processExtruderCommandPacket(int8_t overrideToolIndex) {
     if ( overrideToolIndex != -1 )  toolIndex = (uint8_t)overrideToolIndex;
 
 // MOD Trax BEGIN
-		if(toolIndex)
+		if(swappedToolheads)
 		{
 			if(toolIndex == 1)
 				toolIndex = 0;
