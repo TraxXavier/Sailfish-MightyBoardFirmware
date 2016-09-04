@@ -149,12 +149,13 @@ Motherboard::Motherboard() :
 #ifdef PSTOP_MONITOR
 	, pstop_enc_calibr(eeprom::getEepromFixed16(eeprom_offsets::PSTOP_CALIBRATION,1)) //7.3;
 	, pstop_tolerance((100.0 - eeprom::getEeprom8(eeprom_offsets::PSTOP_TOLERANCE, PSTOP_DEFAULT_TOLERANCE))/100.0)
+	, pstop_waiting(eeprom::getEeprom16(eeprom_offsets::PSTOP_WAITING,PSTOP_DEFAULT_WAITING))
 	
 	, last_seconds(0)
 	
 	, acc_counter(0)
 	, list_pos(0)
-	, wait_counter(0)
+	, run_seconds(0)
 	
 	, was_building(false)
 	
@@ -853,7 +854,7 @@ void Motherboard::runMotherboardSlice() {
 				acc_counter = 0;
 				list_pos = 0;
 				
-				wait_counter = 5; // 2*5 = 10 seconds wait period
+				run_seconds = seconds;
 			}
 			else {
 				int16_t cur_enc_R = 0;
@@ -912,15 +913,17 @@ void Motherboard::runMotherboardSlice() {
 				pstop_test_L = step_L ? (enc_L / step_L) : 0.0;
 				
 				if(step_R > 0 || step_L > 0) { // wait for the print to to start
-					if(wait_counter > 0)
-						wait_counter--;
-					else{	
 	#if defined(PSTOP_SUPPORT)
+					micros_t run_duration = (seconds > run_seconds) ? seconds - run_seconds : 0;
+					if(run_duration > 0x7FFF) // dont overflow if build takes more than 9 hours
+						run_duration = 0x7FFF;
+					if(run_duration > pstop_waiting)
+					{
 						if ( (Motherboard::getBoard().pstop_enabled == 1) 
 								&& ( (cur_step_R > 0 && pstop_test_R < pstop_tolerance) || (cur_step_L > 0 && pstop_test_L < pstop_tolerance) ) )
 							command::pstop_triggered = true;
-	#endif
 					}
+	#endif
 				}
 			}
 		}

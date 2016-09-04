@@ -3089,7 +3089,7 @@ void MaxZProbeHitsScreen::notifyButtonPressed(ButtonArray::ButtonName button) {
 // MOD Trax BEGIN
 #ifdef PSTOP_MONITOR
 PStopSettingsMenu::PStopSettingsMenu() :
-	CounterMenu(_BV((uint8_t)ButtonArray::UP) | _BV((uint8_t)ButtonArray::DOWN), (uint8_t)4
+	CounterMenu(_BV((uint8_t)ButtonArray::UP) | _BV((uint8_t)ButtonArray::DOWN), (uint8_t)5
 		) {
 	reset();
 }
@@ -3098,6 +3098,7 @@ void PStopSettingsMenu::resetState() {
 	counterEnable = eeprom::getEeprom8(eeprom_offsets::PSTOP_ENABLE, 0);
 	counterTolerance = eeprom::getEeprom8(eeprom_offsets::PSTOP_TOLERANCE, PSTOP_DEFAULT_TOLERANCE);
 	counterCalibration = eeprom::getEepromFixed16(eeprom_offsets::PSTOP_CALIBRATION,1);
+	counterWaiting = eeprom::getEeprom16(eeprom_offsets::PSTOP_WAITING,PSTOP_DEFAULT_WAITING);
 
 	itemIndex = firstItemIndex = 0;
 }
@@ -3127,19 +3128,25 @@ void PStopSettingsMenu::drawItem(uint8_t index, LiquidCrystalSerial& lcd) {
 		lcd.write('%');
 		break;
 	case 2:
+		lcd.writeFromPgmspace(PSTOP_MONITOR_WAITING);
+		lcd.setCursor(15, row);
+		lcd.write(selected ? LCD_CUSTOM_CHAR_RIGHT : ' ');
+		lcd.moveWriteInt(16, row, counterWaiting, 3);
+		break;
+	case 3:
+		lcd.writeFromPgmspace(PSTOP_MONITOR_STATUS);
+		if((host::getHostState() == host::HOST_STATE_BUILDING || host::getHostState() == host::HOST_STATE_BUILDING_FROM_SD)) {
+			lcd.writeFloat(Motherboard::getBoard().pstop_test_L, 2, 0);
+			lcd.write('/');
+			lcd.writeFloat(Motherboard::getBoard().pstop_test_R, 2, 0);
+		}
+		break;
+	case 4:
 		lcd.writeFromPgmspace(PSTOP_MONITOR_CALIBRATION);
 		lcd.setCursor(15, row);
 		lcd.write(selected ? LCD_CUSTOM_CHAR_RIGHT : ' ');
 		lcd.writeFloat(counterCalibration, 1, LCD_SCREEN_WIDTH);
-		break;
-	case 3:
-		if((host::getHostState() == host::HOST_STATE_BUILDING || host::getHostState() == host::HOST_STATE_BUILDING_FROM_SD)) {
-			lcd.writeFromPgmspace(PSTOP_MONITOR_STATUS);
-			lcd.writeFloat(Motherboard::getBoard().pstop_test_R, 2, 0);
-			lcd.write('/');
-			lcd.writeFloat(Motherboard::getBoard().pstop_test_L, 2, 0);
-		}
-		break;
+		break;		
 	}
 }
 
@@ -3164,10 +3171,16 @@ void PStopSettingsMenu::handleCounterUpdate(uint8_t index, int8_t up) {
 			counterTolerance = 0;
 		break;
 	case 2:
-		counterCalibration += float(up)/10;
+		counterWaiting += up;
+		if ( counterWaiting > 999 )
+			counterWaiting = 999;
+		else if ( counterWaiting < 0 )
+			counterWaiting = 0;
 		break;
-	case 3:
-		
+	case 3:	
+		break;
+	case 4:
+		counterCalibration += float(up)/10;
 		break;
 	}
 }
@@ -3186,12 +3199,15 @@ void PStopSettingsMenu::handleSelect(uint8_t index) {
 		eeprom_write_byte((uint8_t*)eeprom_offsets::PSTOP_TOLERANCE, counterTolerance);
 		break;
 	case 2:
-		Motherboard::getBoard().pstop_enc_calibr = counterCalibration;
-		eeprom::setEepromFixed16(eeprom_offsets::PSTOP_CALIBRATION, counterCalibration);
+		Motherboard::getBoard().pstop_waiting = counterWaiting;
+		eeprom_write_word((uint16_t*)(eeprom_offsets::PSTOP_ENABLE), counterWaiting);
 		break;
 	case 3:
-		
 		break;
+	case 4:
+		Motherboard::getBoard().pstop_enc_calibr = counterCalibration;
+		eeprom::setEepromFixed16(eeprom_offsets::PSTOP_CALIBRATION, counterCalibration);
+		break;		
 	}
 }
 #endif
@@ -3347,8 +3363,9 @@ void ChangeTempScreen::notifyButtonPressed(ButtonArray::ButtonName button) {
 // MOD Trax END
 	uint16_t step = 1;
 	uint16_t repetitions = Motherboard::getBoard().getInterfaceBoard().getButtonRepetitions();
-	if ( repetitions > 6 ) step *= 5;
-	else if ( repetitions > 18 ) step *= 10;
+	if ( repetitions > 5 ) step *= 5;
+	else if ( repetitions > 10 ) step *= 10;
+	else if ( repetitions > 25 ) step *= 25;
 // MOD Trax BEGIN
 
 	switch (button) {

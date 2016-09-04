@@ -292,6 +292,7 @@ extern const unsigned char MAX_PROBE_HITS_MSG2[];
 #ifdef PSTOP_MONITOR
 extern const unsigned char PSTOP_MONITOR_MSG[];
 extern const unsigned char PSTOP_MONITOR_CALIBRATION[];
+extern const unsigned char PSTOP_MONITOR_WAITING[];
 extern const unsigned char PSTOP_MONITOR_TOLERANCE[];
 extern const unsigned char PSTOP_MONITOR_STATUS[];
 #endif

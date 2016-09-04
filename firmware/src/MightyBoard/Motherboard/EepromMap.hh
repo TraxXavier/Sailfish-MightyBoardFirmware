@@ -391,10 +391,10 @@ const static uint16_t FREE_EEPROM_STARTS        = 0x020C;
 //Sailfish specific settings work backwards from the end of the eeprom 0xFFF
 
 // MOD Trax BEGIN
-//enclosure histeresis (2 byte)
+//pstom wait time in sec (2 byte)
 //$BEGIN_ENTRY
 //$type:H $constraints:m,0,75 $unit:C
-//const static uint16_t PREHEAT_ENCLOSURE_HYSTERESIS	= 0x0F5C;
+const static uint16_t PSTOP_WAITING	= 0x0F5C;
 
 //enclosure preeheet (2 byte)
 //$BEGIN_ENTRY
@@ -506,7 +506,7 @@ const static uint16_t DITTO_PRINT_ENABLED       = 0x0FFF;
 // MOD Trax BEGIN
 #define DEFAULT_PREHEAT_CHE             50
 #define PSTOP_DEFAULT_TOLERANCE					20
-//#define DEFAULT_ENCLOSURE_HYSTERESIS    2
+#define PSTOP_DEFAULT_WAITING    				20
 // MOD Trax END
 #define DEFAULT_HEAT_DURING_PAUSE       0
 

@@ -277,8 +277,9 @@ const PROGMEM prog_uchar MAX_PROBE_HITS_MSG2[] = "Use 0 for unlimited";
 
 // MOD Trax BEGIN
 #ifdef PSTOP_MONITOR
-const PROGMEM prog_uchar PSTOP_MONITOR_MSG[]  = "PStop Settings";
+const PROGMEM prog_uchar PSTOP_MONITOR_MSG[]  				= "PStop Settings";
 const PROGMEM prog_uchar PSTOP_MONITOR_CALIBRATION[]  = "Calibration";
+const PROGMEM prog_uchar PSTOP_MONITOR_WAITING[]  		= "Start Delay";
 const PROGMEM prog_uchar PSTOP_MONITOR_TOLERANCE[]  	= "Tolerance";
 const PROGMEM prog_uchar PSTOP_MONITOR_STATUS[]  			= "Test: ";
 #endif

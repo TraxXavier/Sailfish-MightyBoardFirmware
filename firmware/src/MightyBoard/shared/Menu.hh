@@ -342,6 +342,7 @@ protected:
 	uint16_t counterEnable;
 	uint16_t counterTolerance;
 	float counterCalibration;
+	uint16_t counterWaiting;
 
 	void resetState();
 

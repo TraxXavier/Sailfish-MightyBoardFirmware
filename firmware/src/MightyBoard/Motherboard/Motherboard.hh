@@ -268,6 +268,7 @@ public:
 	
 	float pstop_enc_calibr;
 	float pstop_tolerance;
+	int16_t pstop_waiting;
 	
 	micros_t last_seconds;
 	
@@ -279,7 +280,7 @@ public:
 	
 	int8_t acc_counter;
 	int8_t list_pos;
-	int8_t wait_counter;
+	micros_t run_seconds;
 	
 	bool was_building;
 	
