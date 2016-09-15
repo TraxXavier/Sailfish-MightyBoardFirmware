@@ -3139,11 +3139,13 @@ void PStopSettingsMenu::drawItem(uint8_t index, LiquidCrystalSerial& lcd) {
 			lcd.writeFloat(Motherboard::getBoard().pstop_test_L, 2, 0);
 			lcd.write('/');
 			lcd.writeFloat(Motherboard::getBoard().pstop_test_R, 2, 0);
+			lcd.write(' ');
+			lcd.writeFromPgmspace((Motherboard::getBoard().pstop_armed == 1) ? ON_MSG : OFF_MSG);
 		}
 		break;
 	case 4:
 		lcd.writeFromPgmspace(PSTOP_MONITOR_CALIBRATION);
-		lcd.setCursor(15, row);
+		lcd.setCursor(15, row-4);
 		lcd.write(selected ? LCD_CUSTOM_CHAR_RIGHT : ' ');
 		lcd.writeFloat(counterCalibration, 1, LCD_SCREEN_WIDTH);
 		break;		

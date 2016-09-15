@@ -286,6 +286,8 @@ public:
 	
 	float pstop_test_R;
 	float pstop_test_L;
+	
+	int8_t pstop_armed;
 #endif
 // MOD Trax END
 };

@@ -161,6 +161,8 @@ Motherboard::Motherboard() :
 	
 	, pstop_test_R(0.0)
 	, pstop_test_L(0.0)
+	
+	, pstop_armed(0)
 #endif
 // MOD Trax END
 {
@@ -842,8 +844,10 @@ void Motherboard::runMotherboardSlice() {
 												 //		|| host::getHostState() == host::HOST_STATE_BUILDING_FROM_SD) &&
 													 host::getBuildState() == host::BUILD_RUNNING;
 		
-			if(!is_building)
+			if(!is_building) {
+				pstop_armed = 0;
 				was_building = false;
+			}
 			else if(!was_building){
 				was_building = true;
 			
@@ -854,7 +858,7 @@ void Motherboard::runMotherboardSlice() {
 				acc_counter = 0;
 				list_pos = 0;
 				
-				run_seconds = seconds;
+				pstop_armed = 0;
 			}
 			else {
 				int16_t cur_enc_R = 0;
@@ -913,17 +917,29 @@ void Motherboard::runMotherboardSlice() {
 				pstop_test_L = step_L ? (enc_L / step_L) : 0.0;
 				
 				if(step_R > 0 || step_L > 0) { // wait for the print to to start
-	#if defined(PSTOP_SUPPORT)
-					micros_t run_duration = (seconds > run_seconds) ? seconds - run_seconds : 0;
-					if(run_duration > 0x7FFF) // dont overflow if build takes more than 9 hours
-						run_duration = 0x7FFF;
-					if(run_duration > pstop_waiting)
-					{
+					if(pstop_armed == 0) {
+						uint8_t at;
+						steppers::getStepperPosition(&at);
+						if(Motherboard::getBoard().getExtruderBoard(at).getExtruderHeater().has_reached_target_temperature()
+							&& (Motherboard::getBoard().getPlatformHeater().get_set_temperature() == 0 || Motherboard::getBoard().getPlatformHeater().has_reached_target_temperature())
+						) {
+							run_seconds = seconds;
+							pstop_armed = 2;
+						}
+					}
+					else {
+						micros_t run_duration = ((seconds > run_seconds) ? seconds - run_seconds : 0);
+						if(run_duration > 0x7FFF || run_duration > pstop_waiting) // pstop_waiting is uint16 co handle case if it takes more than 9 hours
+							pstop_armed = 1;
+					}
+					
+#if defined(PSTOP_SUPPORT)
+					if(pstop_armed == 1) {
 						if ( (Motherboard::getBoard().pstop_enabled == 1) 
-								&& ( (cur_step_R > 0 && pstop_test_R < pstop_tolerance) || (cur_step_L > 0 && pstop_test_L < pstop_tolerance) ) )
+						 && ( (cur_step_R > 0 && pstop_test_R < pstop_tolerance) || (cur_step_L > 0 && pstop_test_L < pstop_tolerance) ) )
 							command::pstop_triggered = true;
 					}
-	#endif
+#endif
 				}
 			}
 		}
